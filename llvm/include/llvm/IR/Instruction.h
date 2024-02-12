@@ -115,6 +115,11 @@ private:
   /// O(1) local dominance checks between instructions.
   mutable unsigned Order = 0;
 
+  /// Inline storage that can be used by passes. Only exposed via
+  /// InstructionInlineStorage to detect conflicting uses.
+  friend class InstructionInlineStorage;
+  mutable unsigned AuxData = 0;
+
 public:
   /// Optional marker recording the position for debugging information that
   /// takes effect immediately before this instruction. Null unless there is

@@ -85,6 +85,10 @@ private:
   /// Epoch of block numbers. (Could be shrinked to uint8_t if required.)
   unsigned BlockNumEpoch = 0;
 
+  friend class InstructionInlineStorage;
+  mutable bool InstAuxDataUsed = false;
+  mutable uint32_t InstAuxDataMax = 0;
+
   mutable Argument *Arguments = nullptr;  ///< The formal arguments
   uint32_t NumArgs;
   MaybeAlign PreferredAlign;

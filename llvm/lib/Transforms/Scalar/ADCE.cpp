@@ -131,8 +131,8 @@ class AggressiveDeadCodeElimination {
   bool isLive(BasicBlock *BB) { return BlockInfo[BB].Live; }
 
   /// Mapping of instructions to associated information.
-  DenseMap<Instruction *, InstInfoType> InstInfo;
-  bool isLive(Instruction *I) { return InstInfo[I].Live; }
+  SmallVector<InstInfoType> InstInfo;
+  bool isLive(Instruction *I) { return InstInfo[I->AuxData].Live; }
 
   /// Instructions known to be live where we need to mark
   /// reaching definitions as live.
@@ -237,14 +237,18 @@ void AggressiveDeadCodeElimination::initialize() {
 
   // Initialize instruction map and set pointers to block info.
   InstInfo.reserve(NumInsts);
-  for (auto &BBInfo : BlockInfo)
-    for (Instruction &I : *BBInfo.second.BB)
-      InstInfo[&I].Block = &BBInfo.second;
+  for (auto &BBInfo : BlockInfo) {
+    for (Instruction &I : *BBInfo.second.BB) {
+      I.AuxData = InstInfo.size();
+      InstInfo.push_back(InstInfoType{});
+      InstInfo[I.AuxData].Block = &BBInfo.second;
+    }
+  }
 
   // Since BlockInfoVec holds pointers into InstInfo and vice-versa, we may not
   // add any more elements to either after this point.
   for (auto &BBInfo : BlockInfo)
-    BBInfo.second.TerminatorLiveInfo = &InstInfo[BBInfo.second.Terminator];
+    BBInfo.second.TerminatorLiveInfo = &InstInfo[BBInfo.second.Terminator->AuxData];
 
   // Collect the set of "root" instructions that are known live.
   for (Instruction &I : instructions(F))
@@ -381,7 +385,7 @@ void AggressiveDeadCodeElimination::markLiveInstructions() {
 }
 
 void AggressiveDeadCodeElimination::markLive(Instruction *I) {
-  auto &Info = InstInfo[I];
+  auto &Info = InstInfo[I->AuxData];
   if (Info.Live)
     return;
 
@@ -614,7 +618,7 @@ bool AggressiveDeadCodeElimination::updateDeadRegions() {
   for (auto *BB : BlocksWithDeadTerminators) {
     auto &Info = BlockInfo[BB];
     if (Info.UnconditionalBranch) {
-      InstInfo[Info.Terminator].Live = true;
+      InstInfo[Info.Terminator->AuxData].Live = true;
       continue;
     }
 
@@ -699,18 +703,17 @@ void AggressiveDeadCodeElimination::makeUnconditional(BasicBlock *BB,
   // Just mark live an existing unconditional branch
   if (isUnconditionalBranch(PredTerm)) {
     PredTerm->setSuccessor(0, Target);
-    InstInfo[PredTerm].Live = true;
+    InstInfo[PredTerm->AuxData].Live = true;
     return;
   }
   LLVM_DEBUG(dbgs() << "making unconditional " << BB->getName() << '\n');
   NumBranchesRemoved += 1;
   IRBuilder<> Builder(PredTerm);
   auto *NewTerm = Builder.CreateBr(Target);
-  InstInfo[NewTerm].Live = true;
+  InstInfo[NewTerm->AuxData].Live = true;
   if (const DILocation *DL = PredTerm->getDebugLoc())
     NewTerm->setDebugLoc(DL);
 
-  InstInfo.erase(PredTerm);
   PredTerm->eraseFromParent();
 }
 

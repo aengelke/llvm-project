@@ -58,6 +58,8 @@ private:
   mutable unsigned Order = 0;
 
 public:
+  mutable unsigned AuxData = 0;
+
   /// Optional marker recording the position for debugging information that
   /// takes effect immediately before this instruction. Null unless there is
   /// debugging information present.

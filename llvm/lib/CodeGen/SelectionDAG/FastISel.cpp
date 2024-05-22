@@ -150,7 +150,7 @@ bool FastISel::lowerArguments() {
        I != E; ++I) {
     auto VI = LocalValueMap.find(&*I);
     assert(VI != LocalValueMap.end() && "Missed an argument?");
-    FuncInfo.ValueMap[&*I] = VI->second;
+    FuncInfo.setRegForValue(&*I, VI->second);
   }
   return true;
 }
@@ -354,9 +354,8 @@ Register FastISel::lookUpRegForValue(const Value *V) {
   // cache values defined by Instructions across blocks, and other values
   // only locally. This is because Instructions already have the SSA
   // def-dominates-use requirement enforced.
-  auto I = FuncInfo.ValueMap.find(V);
-  if (I != FuncInfo.ValueMap.end())
-    return I->second;
+  if (Register Reg = FuncInfo.getRegForValue(V))
+    return Reg;
   return LocalValueMap[V];
 }
 
@@ -366,10 +365,10 @@ void FastISel::updateValueMap(const Value *I, Register Reg, unsigned NumRegs) {
     return;
   }
 
-  Register &AssignedReg = FuncInfo.ValueMap[I];
+  Register AssignedReg = FuncInfo.getRegForValue(I);
   if (!AssignedReg)
     // Use the new register.
-    AssignedReg = Reg;
+    FuncInfo.setRegForValue(I, Reg);
   else if (Reg != AssignedReg) {
     // Arrange for uses of AssignedReg to be replaced by uses of Reg.
     for (unsigned i = 0; i < NumRegs; i++) {
@@ -377,7 +376,7 @@ void FastISel::updateValueMap(const Value *I, Register Reg, unsigned NumRegs) {
       FuncInfo.RegsWithFixups.insert(Reg + i);
     }
 
-    AssignedReg = Reg;
+    FuncInfo.setRegForValue(I, Reg);
   }
 }
 
@@ -1716,13 +1715,10 @@ bool FastISel::selectExtractValue(const User *U) {
   Type *AggTy = Op0->getType();
 
   // Get the base result register.
-  Register ResultReg;
-  auto I = FuncInfo.ValueMap.find(Op0);
-  if (I != FuncInfo.ValueMap.end())
-    ResultReg = I->second;
-  else if (isa<Instruction>(Op0))
+  Register ResultReg = FuncInfo.getRegForValue(Op0);
+  if (!ResultReg && isa<Instruction>(Op0))
     ResultReg = FuncInfo.InitializeRegForValue(Op0);
-  else
+  else if (!ResultReg)
     return false; // fast-isel can't handle aggregate constants at the moment
 
   // Get the actual result register, which is an offset from the base register.

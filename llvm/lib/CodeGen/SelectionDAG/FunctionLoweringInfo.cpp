@@ -126,12 +126,21 @@ void FunctionLoweringInfo::set(const Function &fn, MachineFunction &mf,
     }
   }
 
+  // Resize argument-to-register map, so that setRegForValue can populate it
+  // without bounds check.
+  ArgumentMap.resize(Fn->arg_size());
+  InstMap = InstructionInlineData(Fn);
+
   // Initialize the mapping of values to registers.  This is only set up for
   // instruction values that are used outside of the block that defines
   // them.
   const Align StackAlign = TFI->getStackAlign();
   for (const BasicBlock &BB : *Fn) {
     for (const Instruction &I : BB) {
+      // Initialize inline storage with zero to indicate that no register has
+      // been assigned yet.
+      InstMap[I] = 0;
+
       if (const AllocaInst *AI = dyn_cast<AllocaInst>(&I)) {
         Align Alignment = AI->getAlign();
 
@@ -339,7 +348,8 @@ void FunctionLoweringInfo::set(const Function &fn, MachineFunction &mf,
 /// different function.
 void FunctionLoweringInfo::clear() {
   MBBMap.clear();
-  ValueMap.clear();
+  ArgumentMap.clear();
+  InstMap.release();
   VirtReg2Value.clear();
   StaticAllocaMap.clear();
   LiveOutRegInfo.clear();
@@ -387,17 +397,6 @@ Register FunctionLoweringInfo::CreateRegs(Type *Ty, bool isDivergent) {
 Register FunctionLoweringInfo::CreateRegs(const Value *V) {
   return CreateRegs(V->getType(), UA && UA->isDivergentAtDef(V) &&
                                       !TLI->requiresUniformRegister(*MF, V));
-}
-
-Register FunctionLoweringInfo::getRegForValue(const Value *V) const {
-  if (auto It = ValueMap.find(V); It != ValueMap.end())
-    return It->second;
-  return Register();
-}
-
-void FunctionLoweringInfo::setRegForValue(const Value *V, Register Reg) {
-  assert(isa<Instruction>(V) || isa<Argument>(V));
-  ValueMap[V] = Reg;
 }
 
 Register FunctionLoweringInfo::InitializeRegForValue(const Value *V) {
@@ -578,17 +577,21 @@ const Value *
 FunctionLoweringInfo::getValueFromVirtualReg(Register Vreg) {
   if (VirtReg2Value.empty()) {
     SmallVector<EVT, 4> ValueVTs;
-    for (auto &P : ValueMap) {
+    auto addToMap = [&](const Value *V, Register Reg) {
+      if (!Reg)
+        return;
       ValueVTs.clear();
-      ComputeValueVTs(*TLI, Fn->getDataLayout(),
-                      P.first->getType(), ValueVTs);
-      Register Reg = P.second;
+      ComputeValueVTs(*TLI, Fn->getDataLayout(), V->getType(), ValueVTs);
       for (EVT VT : ValueVTs) {
         unsigned NumRegisters = TLI->getNumRegisters(Fn->getContext(), VT);
         for (unsigned i = 0, e = NumRegisters; i != e; ++i)
-          VirtReg2Value[Reg++] = P.first;
+          VirtReg2Value[Reg++] = V;
       }
-    }
+    };
+    for (unsigned i = 0; i < Fn->arg_size(); i++)
+      addToMap(Fn->getArg(i), ArgumentMap[i]);
+    for (const Instruction &I : instructions(*Fn))
+      addToMap(&I, InstMap[I]);
   }
   return VirtReg2Value.lookup(Vreg);
 }

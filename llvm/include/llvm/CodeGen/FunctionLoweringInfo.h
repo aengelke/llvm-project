@@ -22,6 +22,7 @@
 #include "llvm/CodeGen/ISDOpcodes.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
+#include "llvm/IR/InstructionInlineStorage.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
@@ -76,17 +77,29 @@ public:
   SmallVector<MachineBasicBlock *> MBBMap;
 
 private:
-  /// ValueMap - Since we emit code for the function a basic block at a time,
-  /// we must remember which virtual registers hold the values for
-  /// cross-basic-block values.
-  DenseMap<const Value *, Register> ValueMap;
+  /// Map of arguments (vector index) to virtual register.
+  SmallVector<Register> ArgumentMap;
+  InstructionInlineData InstMap;
 
 public:
   /// Get register from ValueMap
-  Register getRegForValue(const Value *V) const;
+  Register getRegForValue(const Value *V) const {
+    if (auto *I = dyn_cast<Instruction>(V))
+      return InstMap[*I];
+    if (auto *Arg = dyn_cast<Argument>(V))
+      return ArgumentMap[Arg->getArgNo()];
+    return Register();
+  }
 
   /// Update ValueMap
-  void setRegForValue(const Value *V, Register Reg);
+  void setRegForValue(const Value *V, Register Reg) {
+    assert((isa<Instruction>(V) || isa<Argument>(V)) &&
+           "ValueMap only stores instructions and arguments");
+    if (auto *Arg = dyn_cast<Argument>(V))
+      ArgumentMap[Arg->getArgNo()] = Reg;
+    else
+      InstMap[*cast<Instruction>(V)] = Reg;
+  }
 
   /// VirtReg2Value map is needed by the Divergence Analysis driven
   /// instruction selection. It is reverted ValueMap. It is computed

@@ -602,7 +602,7 @@ bool PPCFastISel::SelectLoad(const Instruction *I) {
   // Look at the currently assigned register for this instruction
   // to determine the required register class.  This is necessary
   // to constrain RA from using R0/X0 when this is not legal.
-  Register AssignedReg = FuncInfo.ValueMap[I];
+  Register AssignedReg = FuncInfo.getRegForValue(I);
   const TargetRegisterClass *RC =
     AssignedReg ? MRI.getRegClass(AssignedReg) : nullptr;
 
@@ -1170,7 +1170,7 @@ unsigned PPCFastISel::PPCMoveToIntReg(const Instruction *I, MVT VT,
 
   // Look at the currently assigned register for this instruction
   // to determine the required register class.
-  Register AssignedReg = FuncInfo.ValueMap[I];
+  Register AssignedReg = FuncInfo.getRegForValue(I);
   const TargetRegisterClass *RC =
     AssignedReg ? MRI.getRegClass(AssignedReg) : nullptr;
 
@@ -1276,7 +1276,7 @@ bool PPCFastISel::SelectBinaryIntOp(const Instruction *I, unsigned ISDOpcode) {
   // Look at the currently assigned register for this instruction
   // to determine the required register class.  If there is no register,
   // make a conservative choice (don't assign R0).
-  Register AssignedReg = FuncInfo.ValueMap[I];
+  Register AssignedReg = FuncInfo.getRegForValue(I);
   const TargetRegisterClass *RC =
     (AssignedReg ? MRI.getRegClass(AssignedReg) :
      &PPC::GPRC_and_GPRC_NOR0RegClass);
@@ -1921,7 +1921,7 @@ bool PPCFastISel::SelectIntExt(const Instruction *I) {
   // instruction, use it.  Otherwise pick the register class of the
   // correct size that does not contain X0/R0, since we don't know
   // whether downstream uses permit that assignment.
-  Register AssignedReg = FuncInfo.ValueMap[I];
+  Register AssignedReg = FuncInfo.getRegForValue(I);
   const TargetRegisterClass *RC =
     (AssignedReg ? MRI.getRegClass(AssignedReg) :
      (DestVT == MVT::i64 ? &PPC::G8RC_and_G8RC_NOX0RegClass :

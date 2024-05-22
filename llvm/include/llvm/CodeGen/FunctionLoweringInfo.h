@@ -76,10 +76,18 @@ public:
   /// MBBMap - A mapping from LLVM basic blocks to their machine code entry.
   DenseMap<const BasicBlock*, MachineBasicBlock *> MBBMap;
 
+private:
   /// ValueMap - Since we emit code for the function a basic block at a time,
   /// we must remember which virtual registers hold the values for
   /// cross-basic-block values.
   DenseMap<const Value *, Register> ValueMap;
+
+public:
+  /// Get register from ValueMap
+  Register getRegForValue(const Value *V) const;
+
+  /// Update ValueMap
+  void setRegForValue(const Value *V, Register Reg);
 
   /// VirtReg2Value map is needed by the Divergence Analysis driven
   /// instruction selection. It is reverted ValueMap. It is computed
@@ -206,7 +214,7 @@ public:
   /// isExportedInst - Return true if the specified value is an instruction
   /// exported from its block.
   bool isExportedInst(const Value *V) const {
-    return ValueMap.count(V);
+    return getRegForValue(V);
   }
 
   Register CreateReg(MVT VT, bool isDivergent = false);
@@ -259,11 +267,7 @@ public:
   /// called when a block is visited before all of its predecessors.
   void InvalidatePHILiveOutRegInfo(const PHINode *PN) {
     // PHIs with no uses have no ValueMap entry.
-    DenseMap<const Value*, Register>::const_iterator It = ValueMap.find(PN);
-    if (It == ValueMap.end())
-      return;
-
-    Register Reg = It->second;
+    Register Reg = getRegForValue(PN);
     if (Reg == 0)
       return;
 

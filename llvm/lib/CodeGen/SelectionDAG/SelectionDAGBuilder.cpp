@@ -1653,9 +1653,7 @@ bool SelectionDAGBuilder::handleDebugValue(ArrayRef<const Value *> Values,
     // The value is not used in this block yet (or it would have an SDNode).
     // We still want the value to appear for the user if possible -- if it has
     // an associated VReg, we can refer to that instead.
-    auto VMI = FuncInfo.ValueMap.find(V);
-    if (VMI != FuncInfo.ValueMap.end()) {
-      unsigned Reg = VMI->second;
+    if (Register Reg = FuncInfo.getRegForValue(V)) {
       // If this is a PHI node, it may be split up into several MI PHI nodes
       // (in FunctionLoweringInfo::set).
       RegsForValue RFV(V->getContext(), TLI, DAG.getDataLayout(), Reg,
@@ -1719,12 +1717,9 @@ void SelectionDAGBuilder::resolveOrClearDbgInfo() {
 /// getCopyFromRegs - If there was virtual register allocated for the value V
 /// emit CopyFromReg of the specified type Ty. Return empty SDValue() otherwise.
 SDValue SelectionDAGBuilder::getCopyFromRegs(const Value *V, Type *Ty) {
-  DenseMap<const Value *, Register>::iterator It = FuncInfo.ValueMap.find(V);
   SDValue Result;
 
-  if (It != FuncInfo.ValueMap.end()) {
-    Register InReg = It->second;
-
+  if (Register InReg = FuncInfo.getRegForValue(V)) {
     RegsForValue RFV(*DAG.getContext(), DAG.getTargetLoweringInfo(),
                      DAG.getDataLayout(), InReg, Ty,
                      std::nullopt); // This is not an ABI copy.
@@ -2321,11 +2316,10 @@ void SelectionDAGBuilder::CopyToExportRegsIfNeeded(const Value *V) {
   if (V->getType()->isEmptyTy())
     return;
 
-  DenseMap<const Value *, Register>::iterator VMI = FuncInfo.ValueMap.find(V);
-  if (VMI != FuncInfo.ValueMap.end()) {
+  if (Register Reg = FuncInfo.getRegForValue(V)) {
     assert((!V->use_empty() || isa<CallBrInst>(V)) &&
            "Unused value assigned virtual registers!");
-    CopyValueToVirtualRegister(V, VMI->second);
+    CopyValueToVirtualRegister(V, Reg);
   }
 }
 
@@ -6113,19 +6107,17 @@ bool SelectionDAGBuilder::EmitFuncArgumentDbgValue(
       }
     };
 
-    // Check if ValueMap has reg number.
-    DenseMap<const Value *, Register>::const_iterator
-      VMI = FuncInfo.ValueMap.find(V);
-    if (VMI != FuncInfo.ValueMap.end()) {
+    // Check if FuncInfo has reg number.
+    if (Register Reg = FuncInfo.getRegForValue(V)) {
       const auto &TLI = DAG.getTargetLoweringInfo();
-      RegsForValue RFV(V->getContext(), TLI, DAG.getDataLayout(), VMI->second,
+      RegsForValue RFV(V->getContext(), TLI, DAG.getDataLayout(), Reg,
                        V->getType(), std::nullopt);
       if (RFV.occupiesMultipleRegs()) {
         splitMultiRegDbgValue(RFV.getRegsAndSizes());
         return true;
       }
 
-      Op = MachineOperand::CreateReg(VMI->second, false);
+      Op = MachineOperand::CreateReg(Reg, false);
       IsIndirect = Kind != FuncArgumentDbgValueKind::Value;
     } else if (ArgRegsAndSizes.size() > 1) {
       // This was split due to the calling convention, and no virtual register
@@ -6239,14 +6231,13 @@ bool SelectionDAGBuilder::visitEntryValueDbgValue(
   const Argument *Arg = cast<Argument>(Values[0]);
   assert(Arg->hasAttribute(Attribute::AttrKind::SwiftAsync));
 
-  auto ArgIt = FuncInfo.ValueMap.find(Arg);
-  if (ArgIt == FuncInfo.ValueMap.end()) {
+  Register ArgVReg = FuncInfo.getRegForValue(Arg);
+  if (!ArgVReg) {
     LLVM_DEBUG(
         dbgs() << "Dropping dbg.value: expression is entry_value but "
                   "couldn't find an associated register for the Argument\n");
     return true;
   }
-  Register ArgVReg = ArgIt->getSecond();
 
   for (auto [PhysReg, VirtReg] : FuncInfo.RegInfo->liveins())
     if (ArgVReg == VirtReg || ArgVReg == PhysReg) {
@@ -11566,7 +11557,7 @@ void SelectionDAGISel::LowerArguments(const Function &F) {
       // general.
       unsigned Reg = cast<RegisterSDNode>(Res.getOperand(1))->getReg();
       if (Register::isVirtualRegister(Reg)) {
-        FuncInfo->ValueMap[&Arg] = Reg;
+        FuncInfo->setRegForValue(&Arg, Reg);
         continue;
       }
     }
@@ -11654,15 +11645,16 @@ SelectionDAGBuilder::HandlePHINodesInSuccessorBlocks(const BasicBlock *LLVMBB) {
         }
         Reg = RegOut;
       } else {
-        DenseMap<const Value *, Register>::iterator I =
-          FuncInfo.ValueMap.find(PHIOp);
-        if (I != FuncInfo.ValueMap.end())
-          Reg = I->second;
-        else {
-          assert(isa<AllocaInst>(PHIOp) &&
-                 FuncInfo.StaticAllocaMap.count(cast<AllocaInst>(PHIOp)) &&
-                 "Didn't codegen value into a register!??");
+        Reg = FuncInfo.getRegForValue(PHIOp);
+        // An invalid register can either mean that there is no register
+        // allocated, or that the number of registers is zero. In the latter
+        // (and very uncommon) case, CreateRegs will return an invalid
+        // register, and nothing will happen.
+        if (!Reg) {
           Reg = FuncInfo.CreateRegs(PHIOp);
+          assert((!Reg || (isa<AllocaInst>(PHIOp) &&
+                 FuncInfo.StaticAllocaMap.count(cast<AllocaInst>(PHIOp)))) &&
+                 "Didn't codegen value into a register!??");
           CopyValueToVirtualRegister(PHIOp, Reg);
         }
       }
@@ -12374,7 +12366,7 @@ void SelectionDAGBuilder::visitCallBrLandingPad(const CallInst &I) {
   const TargetRegisterInfo *TRI = DAG.getSubtarget().getRegisterInfo();
   MachineRegisterInfo &MRI = DAG.getMachineFunction().getRegInfo();
 
-  unsigned InitialDef = FuncInfo.ValueMap[CBR];
+  unsigned InitialDef = FuncInfo.getRegForValue(CBR);
   SDValue Chain = DAG.getRoot();
 
   // Re-parse the asm constraints string.

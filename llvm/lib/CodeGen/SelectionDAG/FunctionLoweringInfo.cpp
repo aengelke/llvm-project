@@ -285,7 +285,7 @@ void FunctionLoweringInfo::set(const Function &fn, MachineFunction &mf,
         continue;
 
       DebugLoc DL = PN.getDebugLoc();
-      unsigned PHIReg = ValueMap[&PN];
+      unsigned PHIReg = getRegForValue(&PN);
       assert(PHIReg && "PHI node does not have an assigned virtual register!");
 
       SmallVector<EVT, 4> ValueVTs;
@@ -401,14 +401,26 @@ Register FunctionLoweringInfo::CreateRegs(const Value *V) {
                                       !TLI->requiresUniformRegister(*MF, V));
 }
 
+Register FunctionLoweringInfo::getRegForValue(const Value *V) const {
+  if (auto It = ValueMap.find(V); It != ValueMap.end())
+    return It->second;
+  return Register();
+}
+
+void FunctionLoweringInfo::setRegForValue(const Value *V, Register Reg) {
+  assert(isa<Instruction>(V) || isa<Argument>(V));
+  ValueMap[V] = Reg;
+}
+
 Register FunctionLoweringInfo::InitializeRegForValue(const Value *V) {
   // Tokens live in vregs only when used for convergence control.
   if (V->getType()->isTokenTy() && !isa<ConvergenceControlInst>(V))
     return 0;
-  Register &R = ValueMap[V];
-  assert(R == Register() && "Already initialized this value register!");
+  assert(!getRegForValue(V) && "Already initialized this value register!");
   assert(VirtReg2Value.empty());
-  return R = CreateRegs(V);
+  Register R = CreateRegs(V);
+  setRegForValue(V, R);
+  return R;
 }
 
 /// GetLiveOutRegInfo - Gets LiveOutInfo for a register, returning NULL if the
@@ -451,11 +463,7 @@ void FunctionLoweringInfo::ComputePHILiveOutRegInfo(const PHINode *PN) {
   IntVT = TLI->getRegisterType(PN->getContext(), IntVT);
   unsigned BitWidth = IntVT.getSizeInBits();
 
-  auto It = ValueMap.find(PN);
-  if (It == ValueMap.end())
-    return;
-
-  Register DestReg = It->second;
+  Register DestReg = getRegForValue(PN);
   if (DestReg == 0)
     return;
   assert(DestReg.isVirtual() && "Expected a virtual reg");
@@ -478,9 +486,9 @@ void FunctionLoweringInfo::ComputePHILiveOutRegInfo(const PHINode *PN) {
     DestLOI.NumSignBits = Val.getNumSignBits();
     DestLOI.Known = KnownBits::makeConstant(Val);
   } else {
-    assert(ValueMap.count(V) && "V should have been placed in ValueMap when its"
-                                "CopyToReg node was created.");
-    Register SrcReg = ValueMap[V];
+    Register SrcReg = getRegForValue(V);
+    assert(SrcReg && "V should have been placed in ValueMap when its"
+                     "CopyToReg node was created.");
     if (!SrcReg.isVirtual()) {
       DestLOI.IsValid = false;
       return;
@@ -517,9 +525,9 @@ void FunctionLoweringInfo::ComputePHILiveOutRegInfo(const PHINode *PN) {
       continue;
     }
 
-    assert(ValueMap.count(V) && "V should have been placed in ValueMap when "
-                                "its CopyToReg node was created.");
-    Register SrcReg = ValueMap[V];
+    Register SrcReg = getRegForValue(V);
+    assert(SrcReg && "V should have been placed in ValueMap when "
+                     "its CopyToReg node was created.");
     if (!SrcReg.isVirtual()) {
       DestLOI.IsValid = false;
       return;

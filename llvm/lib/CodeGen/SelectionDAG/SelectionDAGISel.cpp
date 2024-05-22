@@ -1385,10 +1385,9 @@ static bool processIfEntryValueDbgDeclare(FunctionLoweringInfo &FuncInfo,
   if (!Expr->isEntryValue() || !isa<Argument>(Arg))
     return false;
 
-  auto ArgIt = FuncInfo.ValueMap.find(Arg);
-  if (ArgIt == FuncInfo.ValueMap.end())
+  Register ArgVReg = FuncInfo.getRegForValue(Arg);
+  if (!ArgVReg)
     return false;
-  Register ArgVReg = ArgIt->getSecond();
 
   // Find the corresponding livein physical register to this argument.
   for (auto [PhysReg, VirtReg] : FuncInfo.RegInfo->liveins())
@@ -1675,9 +1674,8 @@ void SelectionDAGISel::SelectAllBasicBlocks(const Function &Fn) {
 
           if (!Inst->getType()->isVoidTy() && !Inst->getType()->isTokenTy() &&
               !Inst->use_empty()) {
-            Register &R = FuncInfo->ValueMap[Inst];
-            if (!R)
-              R = FuncInfo->CreateRegs(Inst);
+            if (!FuncInfo->getRegForValue(Inst))
+              FuncInfo->setRegForValue(Inst, FuncInfo->CreateRegs(Inst));
           }
 
           bool HadTailCall = false;

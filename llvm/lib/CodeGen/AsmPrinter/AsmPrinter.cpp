@@ -3050,12 +3050,12 @@ void AsmPrinter::emitModuleIdents(Module &M) {
 }
 
 void AsmPrinter::emitModuleCommandLines(Module &M) {
-  MCSection *CommandLine = getObjFileLowering().getSectionForCommandLines();
-  if (!CommandLine)
-    return;
-
   const NamedMDNode *NMD = M.getNamedMetadata("llvm.commandline");
   if (!NMD || !NMD->getNumOperands())
+    return;
+
+  MCSection *CommandLine = getObjFileLowering().getSectionForCommandLines();
+  if (!CommandLine)
     return;
 
   OutStreamer->pushSection();

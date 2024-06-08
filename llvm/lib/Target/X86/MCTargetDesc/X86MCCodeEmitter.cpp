@@ -25,6 +25,8 @@
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Endian.h"
+#include "llvm/Support/EndianStream.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <cassert>
 #include <cstdint>
@@ -403,9 +405,21 @@ static uint8_t modRMByte(unsigned Mod, unsigned RegOpcode, unsigned RM) {
 static void emitConstant(uint64_t Val, unsigned Size,
                          SmallVectorImpl<char> &CB) {
   // Output the constant in little endian byte order.
-  for (unsigned i = 0; i != Size; ++i) {
-    emitByte(Val & 255, CB);
-    Val >>= 8;
+  switch (Size) {
+  case 1:
+    support::endian::write<uint8_t>(CB, Val, llvm::endianness::little);
+    break;
+  case 2:
+    support::endian::write<uint16_t>(CB, Val, llvm::endianness::little);
+    break;
+  case 4:
+    support::endian::write<uint32_t>(CB, Val, llvm::endianness::little);
+    break;
+  case 8:
+    support::endian::write<uint64_t>(CB, Val, llvm::endianness::little);
+    break;
+  default:
+    assert(false && "unexpected immediate size");
   }
 }
 

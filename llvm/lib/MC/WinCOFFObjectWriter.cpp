@@ -1099,7 +1099,7 @@ uint64_t WinCOFFWriter::writeObject(MCAssembler &Asm,
   if (Mode != DwoOnly && OWriter.EmitAddrsigSection) {
     auto Frag = new MCDataFragment(AddrsigSection);
     Frag->setLayoutOrder(0);
-    raw_svector_ostream OS(Frag->getContents());
+    raw_svector_ostream OS(Frag->getContentsForAppending());
     for (const MCSymbol *S : OWriter.AddrsigSyms) {
       if (!S->isRegistered())
         continue;
@@ -1114,13 +1114,14 @@ uint64_t WinCOFFWriter::writeObject(MCAssembler &Asm,
              "executePostLayoutBinding!");
       encodeULEB128(SectionMap[TargetSection]->Symbol->getIndex(), OS);
     }
+    Frag->doneAppending();
   }
 
   // Create the contents of the .llvm.call-graph-profile section.
   if (Mode != DwoOnly && CGProfileSection) {
     auto *Frag = new MCDataFragment(CGProfileSection);
     Frag->setLayoutOrder(0);
-    raw_svector_ostream OS(Frag->getContents());
+    raw_svector_ostream OS(Frag->getContentsForAppending());
     for (const MCAssembler::CGProfileEntry &CGPE : Asm.CGProfile) {
       uint32_t FromIndex = CGPE.From->getSymbol().getIndex();
       uint32_t ToIndex = CGPE.To->getSymbol().getIndex();
@@ -1128,6 +1129,7 @@ uint64_t WinCOFFWriter::writeObject(MCAssembler &Asm,
       support::endian::write(OS, ToIndex, W.Endian);
       support::endian::write(OS, CGPE.Count, W.Endian);
     }
+    Frag->doneAppending();
   }
 
   assignFileOffsets(Asm, Layout);

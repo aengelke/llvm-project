@@ -579,17 +579,17 @@ static void writeFragment(raw_ostream &OS, const MCAssembler &Asm,
 
   case MCFragment::FT_Data:
     ++stats::EmittedDataFragments;
-    OS << cast<MCDataFragment>(F).getContents();
+    OS << StringRef(cast<MCDataFragment>(F).getContents().data(), cast<MCDataFragment>(F).getContents().size());
     break;
 
   case MCFragment::FT_Relaxable:
     ++stats::EmittedRelaxableFragments;
-    OS << cast<MCRelaxableFragment>(F).getContents();
+    OS << StringRef(cast<MCRelaxableFragment>(F).getContents().data(), cast<MCRelaxableFragment>(F).getContents().size());
     break;
 
   case MCFragment::FT_CompactEncodedInst:
     ++stats::EmittedCompactEncodedInstFragments;
-    OS << cast<MCCompactEncodedInstFragment>(F).getContents();
+    OS << StringRef(cast<MCCompactEncodedInstFragment>(F).getContents().data(), cast<MCCompactEncodedInstFragment>(F).getContents().size());
     break;
 
   case MCFragment::FT_Fill: {
@@ -670,7 +670,7 @@ static void writeFragment(raw_ostream &OS, const MCAssembler &Asm,
 
   case MCFragment::FT_LEB: {
     const MCLEBFragment &LF = cast<MCLEBFragment>(F);
-    OS << LF.getContents();
+    OS << StringRef(LF.getContents().data(), LF.getContents().size());
     break;
   }
 
@@ -700,27 +700,27 @@ static void writeFragment(raw_ostream &OS, const MCAssembler &Asm,
 
   case MCFragment::FT_Dwarf: {
     const MCDwarfLineAddrFragment &OF = cast<MCDwarfLineAddrFragment>(F);
-    OS << OF.getContents();
+    OS << StringRef(OF.getContents().data(), OF.getContents().size());
     break;
   }
   case MCFragment::FT_DwarfFrame: {
     const MCDwarfCallFrameFragment &CF = cast<MCDwarfCallFrameFragment>(F);
-    OS << CF.getContents();
+    OS << StringRef(CF.getContents().data(), CF.getContents().size());
     break;
   }
   case MCFragment::FT_CVInlineLines: {
     const auto &OF = cast<MCCVInlineLineTableFragment>(F);
-    OS << OF.getContents();
+    OS << StringRef(OF.getContents().data(), OF.getContents().size());
     break;
   }
   case MCFragment::FT_CVDefRange: {
     const auto &DRF = cast<MCCVDefRangeFragment>(F);
-    OS << DRF.getContents();
+    OS << StringRef(DRF.getContents().data(), DRF.getContents().size());
     break;
   }
   case MCFragment::FT_PseudoProbe: {
     const MCPseudoProbeAddrFragment &PF = cast<MCPseudoProbeAddrFragment>(F);
-    OS << PF.getContents();
+    OS << StringRef(PF.getContents().data(), PF.getContents().size());
     break;
   }
   case MCFragment::FT_Dummy:
@@ -1003,9 +1003,10 @@ bool MCAssembler::relaxInstruction(MCAsmLayout &Layout,
   // Encode the new instruction.
   F.setInst(Relaxed);
   F.getFixups().clear();
-  F.getContents().clear();
-  getEmitter().encodeInstruction(Relaxed, F.getContents(), F.getFixups(),
+  F.clearContents();
+  getEmitter().encodeInstruction(Relaxed, F.getContentsForAppending(), F.getFixups(),
                                  *F.getSubtargetInfo());
+  F.doneAppending();
   return true;
 }
 
@@ -1013,7 +1014,6 @@ bool MCAssembler::relaxLEB(MCAsmLayout &Layout, MCLEBFragment &LF) {
   const unsigned OldSize = static_cast<unsigned>(LF.getContents().size());
   unsigned PadTo = OldSize;
   int64_t Value;
-  SmallVectorImpl<char> &Data = LF.getContents();
   LF.getFixups().clear();
   // Use evaluateKnownAbsolute for Mach-O as a hack: .subsections_via_symbols
   // requires that .uleb128 A-B is foldable where A and B reside in different
@@ -1035,8 +1035,8 @@ bool MCAssembler::relaxLEB(MCAsmLayout &Layout, MCLEBFragment &LF) {
     if (UseZeroPad)
       Value = 0;
   }
-  Data.clear();
-  raw_svector_ostream OSE(Data);
+  LF.clearContents();
+  raw_svector_ostream OSE(LF.getContentsForAppending());
   // The compiler can generate EH table assembly that is impossible to assemble
   // without either adding padding to an LEB fragment or adding extra padding
   // to a later alignment fragment. To accommodate such tables, relaxation can
@@ -1045,6 +1045,7 @@ bool MCAssembler::relaxLEB(MCAsmLayout &Layout, MCLEBFragment &LF) {
     encodeSLEB128(Value, OSE, PadTo);
   else
     encodeULEB128(Value, OSE, PadTo);
+  LF.doneAppending();
   return OldSize != LF.getContents().size();
 }
 
@@ -1125,13 +1126,13 @@ bool MCAssembler::relaxDwarfLineAddr(MCAsmLayout &Layout,
   (void)Abs;
   int64_t LineDelta;
   LineDelta = DF.getLineDelta();
-  SmallVectorImpl<char> &Data = DF.getContents();
-  Data.clear();
+  DF.clearContents();
   DF.getFixups().clear();
 
   MCDwarfLineAddr::encode(Context, getDWARFLinetableParams(), LineDelta,
-                          AddrDelta, Data);
-  return OldSize != Data.size();
+                          AddrDelta, DF.getContentsForAppending());
+  DF.doneAppending();
+  return OldSize != DF.getContents().size();
 }
 
 bool MCAssembler::relaxDwarfCallFrameFragment(MCAsmLayout &Layout,
@@ -1150,13 +1151,13 @@ bool MCAssembler::relaxDwarfCallFrameFragment(MCAsmLayout &Layout,
     return false;
   }
 
-  SmallVectorImpl<char> &Data = DF.getContents();
-  uint64_t OldSize = Data.size();
-  Data.clear();
+  uint64_t OldSize = DF.getContents().size();
+  DF.clearContents();
   DF.getFixups().clear();
 
-  MCDwarfFrameEmitter::encodeAdvanceLoc(Context, Value, Data);
-  return OldSize != Data.size();
+  MCDwarfFrameEmitter::encodeAdvanceLoc(Context, Value, DF.getContentsForAppending());
+  DF.doneAppending();
+  return OldSize != DF.getContents().size();
 }
 
 bool MCAssembler::relaxCVInlineLineTable(MCAsmLayout &Layout,
@@ -1180,14 +1181,14 @@ bool MCAssembler::relaxPseudoProbeAddr(MCAsmLayout &Layout,
   bool Abs = PF.getAddrDelta().evaluateKnownAbsolute(AddrDelta, Layout);
   assert(Abs && "We created a pseudo probe with an invalid expression");
   (void)Abs;
-  SmallVectorImpl<char> &Data = PF.getContents();
-  Data.clear();
-  raw_svector_ostream OSE(Data);
+  PF.clearContents();
+  raw_svector_ostream OSE(PF.getContentsForAppending());
   PF.getFixups().clear();
 
   // AddrDelta is a signed integer
   encodeSLEB128(AddrDelta, OSE, OldSize);
-  return OldSize != Data.size();
+  PF.doneAppending();
+  return OldSize != PF.getContents().size();
 }
 
 bool MCAssembler::relaxFragment(MCAsmLayout &Layout, MCFragment &F) {

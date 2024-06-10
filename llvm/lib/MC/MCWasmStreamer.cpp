@@ -49,7 +49,7 @@ void MCWasmStreamer::mergeFragment(MCDataFragment *DF, MCDataFragment *EF) {
   }
   if (DF->getSubtargetInfo() == nullptr && EF->getSubtargetInfo())
     DF->setHasInstructions(*EF->getSubtargetInfo());
-  DF->getContents().append(EF->getContents().begin(), EF->getContents().end());
+  DF->appendContents(EF->getContents());
 }
 
 void MCWasmStreamer::emitLabel(MCSymbol *S, SMLoc Loc) {
@@ -211,7 +211,7 @@ void MCWasmStreamer::emitInstToData(const MCInst &Inst,
     DF->getFixups().push_back(Fixups[I]);
   }
   DF->setHasInstructions(STI);
-  DF->getContents().append(Code.begin(), Code.end());
+  DF->appendContents(Code);
 }
 
 void MCWasmStreamer::finishImpl() {

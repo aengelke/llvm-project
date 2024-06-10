@@ -739,11 +739,11 @@ static void addData(SmallVectorImpl<char> &DataBytes,
       DataBytes.insert(DataBytes.end(), Fill->getValueSize() * NumValues,
                        Fill->getValue());
     } else if (auto *LEB = dyn_cast<MCLEBFragment>(&Frag)) {
-      const SmallVectorImpl<char> &Contents = LEB->getContents();
+      ArrayRef<char> Contents = LEB->getContents();
       llvm::append_range(DataBytes, Contents);
     } else {
       const auto &DataFrag = cast<MCDataFragment>(Frag);
-      const SmallVectorImpl<char> &Contents = DataFrag.getContents();
+      ArrayRef<char> Contents = DataFrag.getContents();
       llvm::append_range(DataBytes, Contents);
     }
   }
@@ -1891,7 +1891,7 @@ uint64_t WasmObjectWriter::writeOneObject(MCAssembler &Asm,
         report_fatal_error("invalid .init_array section priority");
     }
     const auto &DataFrag = cast<MCDataFragment>(Frag);
-    const SmallVectorImpl<char> &Contents = DataFrag.getContents();
+    ArrayRef<char> Contents = DataFrag.getContents();
     for (const uint8_t *
              P = (const uint8_t *)Contents.data(),
             *End = (const uint8_t *)Contents.data() + Contents.size();

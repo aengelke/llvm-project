@@ -125,13 +125,13 @@ void MCObjectStreamer::resolvePendingFixups() {
     case MCFragment::FT_Relaxable:
     case MCFragment::FT_Dwarf:
     case MCFragment::FT_PseudoProbe:
-      cast<MCEncodedFragmentWithFixups<8, 1>>(SymFragment)
+      cast<MCEncodedFragmentWithFixups<1>>(SymFragment)
           ->getFixups()
           .push_back(PendingFixup.Fixup);
       break;
     case MCFragment::FT_Data:
     case MCFragment::FT_CVDefRange:
-      cast<MCEncodedFragmentWithFixups<32, 4>>(SymFragment)
+      cast<MCEncodedFragmentWithFixups<4>>(SymFragment)
           ->getFixups()
           .push_back(PendingFixup.Fixup);
       break;
@@ -266,7 +266,7 @@ void MCObjectStreamer::emitValueImpl(const MCExpr *Value, unsigned Size,
   DF->getFixups().push_back(
       MCFixup::create(DF->getContents().size(), Value,
                       MCFixup::getKindForSize(Size, false), Loc));
-  DF->getContents().resize(DF->getContents().size() + Size, 0);
+  DF->appendContents(Size, 0);
 }
 
 MCSymbol *MCObjectStreamer::emitCFILabel() {
@@ -480,7 +480,7 @@ void MCObjectStreamer::emitInstToFragment(const MCInst &Inst,
   SmallString<128> Code;
   getAssembler().getEmitter().encodeInstruction(Inst, Code, IF->getFixups(),
                                                 STI);
-  IF->getContents().append(Code.begin(), Code.end());
+  IF->appendContents(Code);
 }
 
 #ifndef NDEBUG
@@ -636,7 +636,7 @@ void MCObjectStreamer::emitBytes(StringRef Data) {
   MCDwarfLineEntry::make(this, getCurrentSectionOnly());
   MCDataFragment *DF = getOrCreateDataFragment();
   flushPendingLabels(DF, DF->getContents().size());
-  DF->getContents().append(Data.begin(), Data.end());
+  DF->appendContents(ArrayRef(Data.data(), Data.size()));
 }
 
 void MCObjectStreamer::emitValueToAlignment(Align Alignment, int64_t Value,
@@ -671,7 +671,7 @@ void MCObjectStreamer::emitDTPRel32Value(const MCExpr *Value) {
 
   DF->getFixups().push_back(MCFixup::create(DF->getContents().size(),
                                             Value, FK_DTPRel_4));
-  DF->getContents().resize(DF->getContents().size() + 4, 0);
+  DF->appendContents(4, 0);
 }
 
 // Associate DTPRel64 fixup with data and resize data area
@@ -681,7 +681,7 @@ void MCObjectStreamer::emitDTPRel64Value(const MCExpr *Value) {
 
   DF->getFixups().push_back(MCFixup::create(DF->getContents().size(),
                                             Value, FK_DTPRel_8));
-  DF->getContents().resize(DF->getContents().size() + 8, 0);
+  DF->appendContents(8, 0);
 }
 
 // Associate TPRel32 fixup with data and resize data area
@@ -691,7 +691,7 @@ void MCObjectStreamer::emitTPRel32Value(const MCExpr *Value) {
 
   DF->getFixups().push_back(MCFixup::create(DF->getContents().size(),
                                             Value, FK_TPRel_4));
-  DF->getContents().resize(DF->getContents().size() + 4, 0);
+  DF->appendContents(4, 0);
 }
 
 // Associate TPRel64 fixup with data and resize data area
@@ -701,7 +701,7 @@ void MCObjectStreamer::emitTPRel64Value(const MCExpr *Value) {
 
   DF->getFixups().push_back(MCFixup::create(DF->getContents().size(),
                                             Value, FK_TPRel_8));
-  DF->getContents().resize(DF->getContents().size() + 8, 0);
+  DF->appendContents(8, 0);
 }
 
 // Associate GPRel32 fixup with data and resize data area
@@ -711,7 +711,7 @@ void MCObjectStreamer::emitGPRel32Value(const MCExpr *Value) {
 
   DF->getFixups().push_back(
       MCFixup::create(DF->getContents().size(), Value, FK_GPRel_4));
-  DF->getContents().resize(DF->getContents().size() + 4, 0);
+  DF->appendContents(4, 0);
 }
 
 // Associate GPRel64 fixup with data and resize data area
@@ -721,7 +721,7 @@ void MCObjectStreamer::emitGPRel64Value(const MCExpr *Value) {
 
   DF->getFixups().push_back(
       MCFixup::create(DF->getContents().size(), Value, FK_GPRel_4));
-  DF->getContents().resize(DF->getContents().size() + 8, 0);
+  DF->appendContents(8, 0);
 }
 
 static std::optional<std::pair<bool, std::string>>

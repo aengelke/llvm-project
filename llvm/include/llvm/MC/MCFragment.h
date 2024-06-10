@@ -180,9 +180,9 @@ public:
 /// Interface implemented by fragments that contain encoded instructions and/or
 /// data.
 ///
-template<unsigned ContentsSize>
 class MCEncodedFragmentWithContents : public MCEncodedFragment {
-  SmallVector<char, ContentsSize> Contents;
+  uint32_t ContentStart = 0;
+  uint32_t ContentSize = 0;
 
 protected:
   MCEncodedFragmentWithContents(MCFragment::FragmentType FType,
@@ -191,16 +191,38 @@ protected:
       : MCEncodedFragment(FType, HasInstructions, Sec) {}
 
 public:
-  SmallVectorImpl<char> &getContents() { return Contents; }
-  const SmallVectorImpl<char> &getContents() const { return Contents; }
+  // SmallVectorImpl<char> &getContents() { return Contents; }
+  // const SmallVectorImpl<char> &getContents() const { return Contents; }
+  void setContents(uint32_t Start, uint32_t Size) {
+    ContentStart = Start;
+    ContentSize = Size;
+  }
+  void setContents(ArrayRef<char> Contents) {
+    clearContents();
+    appendContents(Contents);
+  }
+  void appendContents(ArrayRef<char> Contents) {
+    getContentsForAppending().append(Contents.begin(), Contents.end());
+    doneAppending();
+  }
+  void appendContents(size_t Num, char Elt) {
+    getContentsForAppending().append(Num, Elt);
+    doneAppending();
+  }
+  void clearContents() { ContentSize = 0; }
+  SmallVectorImpl<char> &getContentsForAppending();
+  void doneAppending();
+
+  MutableArrayRef<char> getContents();
+  ArrayRef<char> getContents() const;
 };
 
 /// Interface implemented by fragments that contain encoded instructions and/or
 /// data and also have fixups registered.
 ///
-template<unsigned ContentsSize, unsigned FixupsSize>
+template<unsigned FixupsSize>
 class MCEncodedFragmentWithFixups :
-  public MCEncodedFragmentWithContents<ContentsSize> {
+  public MCEncodedFragmentWithContents {
 
   /// The list of fixups in this fragment.
   SmallVector<MCFixup, FixupsSize> Fixups;
@@ -209,8 +231,7 @@ protected:
   MCEncodedFragmentWithFixups(MCFragment::FragmentType FType,
                               bool HasInstructions,
                               MCSection *Sec)
-      : MCEncodedFragmentWithContents<ContentsSize>(FType, HasInstructions,
-                                                    Sec) {}
+      : MCEncodedFragmentWithContents(FType, HasInstructions, Sec) {}
 
 public:
 
@@ -236,10 +257,10 @@ public:
 
 /// Fragment for data and encoded instructions.
 ///
-class MCDataFragment : public MCEncodedFragmentWithFixups<32, 4> {
+class MCDataFragment : public MCEncodedFragmentWithFixups<4> {
 public:
   MCDataFragment(MCSection *Sec = nullptr)
-      : MCEncodedFragmentWithFixups<32, 4>(FT_Data, false, Sec) {}
+      : MCEncodedFragmentWithFixups<4>(FT_Data, false, Sec) {}
 
   static bool classof(const MCFragment *F) {
     return F->getKind() == MCFragment::FT_Data;
@@ -254,7 +275,7 @@ public:
 /// it can be used instead of MCDataFragment and lead to lower memory
 /// consumption.
 ///
-class MCCompactEncodedInstFragment : public MCEncodedFragmentWithContents<4> {
+class MCCompactEncodedInstFragment : public MCEncodedFragmentWithContents {
 public:
   MCCompactEncodedInstFragment(MCSection *Sec = nullptr)
       : MCEncodedFragmentWithContents(FT_CompactEncodedInst, true, Sec) {
@@ -268,7 +289,7 @@ public:
 /// A relaxable fragment holds on to its MCInst, since it may need to be
 /// relaxed during the assembler layout and relaxation stage.
 ///
-class MCRelaxableFragment : public MCEncodedFragmentWithFixups<8, 1> {
+class MCRelaxableFragment : public MCEncodedFragmentWithFixups<1> {
 
   /// The instruction this is a fragment for.
   MCInst Inst;
@@ -425,7 +446,7 @@ public:
   }
 };
 
-class MCLEBFragment final : public MCEncodedFragmentWithFixups<8, 0> {
+class MCLEBFragment final : public MCEncodedFragmentWithFixups<0> {
   /// True if this is a sleb128, false if uleb128.
   bool IsSigned;
 
@@ -434,9 +455,11 @@ class MCLEBFragment final : public MCEncodedFragmentWithFixups<8, 0> {
 
 public:
   MCLEBFragment(const MCExpr &Value, bool IsSigned, MCSection *Sec = nullptr)
-      : MCEncodedFragmentWithFixups<8, 0>(FT_LEB, false, Sec),
+      : MCEncodedFragmentWithFixups<0>(FT_LEB, false, Sec),
         IsSigned(IsSigned), Value(&Value) {
-    getContents().push_back(0);
+    // FIXME: hack
+    setContents(0, 1); // data doesn't matter.
+    // getContents().push_back(0);
   }
 
   const MCExpr &getValue() const { return *Value; }
@@ -451,7 +474,7 @@ public:
   }
 };
 
-class MCDwarfLineAddrFragment : public MCEncodedFragmentWithFixups<8, 1> {
+class MCDwarfLineAddrFragment : public MCEncodedFragmentWithFixups<1> {
   /// The value of the difference between the two line numbers
   /// between two .loc dwarf directives.
   int64_t LineDelta;
@@ -463,7 +486,7 @@ class MCDwarfLineAddrFragment : public MCEncodedFragmentWithFixups<8, 1> {
 public:
   MCDwarfLineAddrFragment(int64_t LineDelta, const MCExpr &AddrDelta,
                           MCSection *Sec = nullptr)
-      : MCEncodedFragmentWithFixups<8, 1>(FT_Dwarf, false, Sec),
+      : MCEncodedFragmentWithFixups<1>(FT_Dwarf, false, Sec),
         LineDelta(LineDelta), AddrDelta(&AddrDelta) {}
 
   int64_t getLineDelta() const { return LineDelta; }
@@ -475,14 +498,14 @@ public:
   }
 };
 
-class MCDwarfCallFrameFragment : public MCEncodedFragmentWithFixups<8, 1> {
+class MCDwarfCallFrameFragment : public MCEncodedFragmentWithFixups<1> {
   /// The expression for the difference of the two symbols that
   /// make up the address delta between two .cfi_* dwarf directives.
   const MCExpr *AddrDelta;
 
 public:
   MCDwarfCallFrameFragment(const MCExpr &AddrDelta, MCSection *Sec = nullptr)
-      : MCEncodedFragmentWithFixups<8, 1>(FT_DwarfFrame, false, Sec),
+      : MCEncodedFragmentWithFixups<1>(FT_DwarfFrame, false, Sec),
         AddrDelta(&AddrDelta) {}
 
   const MCExpr &getAddrDelta() const { return *AddrDelta; }
@@ -544,7 +567,7 @@ public:
 };
 
 /// Fragment representing the .cv_def_range directive.
-class MCCVDefRangeFragment : public MCEncodedFragmentWithFixups<32, 4> {
+class MCCVDefRangeFragment : public MCEncodedFragmentWithFixups<4> {
   SmallVector<std::pair<const MCSymbol *, const MCSymbol *>, 2> Ranges;
   SmallString<32> FixedSizePortion;
 
@@ -556,7 +579,7 @@ public:
   MCCVDefRangeFragment(
       ArrayRef<std::pair<const MCSymbol *, const MCSymbol *>> Ranges,
       StringRef FixedSizePortion, MCSection *Sec = nullptr)
-      : MCEncodedFragmentWithFixups<32, 4>(FT_CVDefRange, false, Sec),
+      : MCEncodedFragmentWithFixups<4>(FT_CVDefRange, false, Sec),
         Ranges(Ranges.begin(), Ranges.end()),
         FixedSizePortion(FixedSizePortion) {}
 
@@ -611,14 +634,14 @@ public:
   }
 };
 
-class MCPseudoProbeAddrFragment : public MCEncodedFragmentWithFixups<8, 1> {
+class MCPseudoProbeAddrFragment : public MCEncodedFragmentWithFixups<1> {
   /// The expression for the difference of the two symbols that
   /// make up the address delta between two .pseudoprobe directives.
   const MCExpr *AddrDelta;
 
 public:
   MCPseudoProbeAddrFragment(const MCExpr *AddrDelta, MCSection *Sec = nullptr)
-      : MCEncodedFragmentWithFixups<8, 1>(FT_PseudoProbe, false, Sec),
+      : MCEncodedFragmentWithFixups<1>(FT_PseudoProbe, false, Sec),
         AddrDelta(AddrDelta) {}
 
   const MCExpr &getAddrDelta() const { return *AddrDelta; }

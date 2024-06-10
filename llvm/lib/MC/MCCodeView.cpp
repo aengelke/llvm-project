@@ -140,13 +140,13 @@ MCDataFragment *CodeViewContext::getStringTableFragment() {
   if (!StrTabFragment) {
     StrTabFragment = new MCDataFragment();
     // Start a new string table out with a null byte.
-    StrTabFragment->getContents().push_back('\0');
+    StrTabFragment->appendContents('\0');
   }
   return StrTabFragment;
 }
 
 std::pair<StringRef, unsigned> CodeViewContext::addToStringTable(StringRef S) {
-  SmallVectorImpl<char> &Contents = getStringTableFragment()->getContents();
+  ArrayRef<char> Contents = getStringTableFragment()->getContents();
   auto Insertion =
       StringTable.insert(std::make_pair(S, unsigned(Contents.size())));
   // Return the string from the table, since it is stable.
@@ -154,7 +154,8 @@ std::pair<StringRef, unsigned> CodeViewContext::addToStringTable(StringRef S) {
       std::make_pair(Insertion.first->first(), Insertion.first->second);
   if (Insertion.second) {
     // The string map key is always null terminated.
-    Contents.append(Ret.first.begin(), Ret.first.end() + 1);
+    getStringTableFragment()->getContentsForAppending().append(Ret.first.begin(), Ret.first.end() + 1);
+    getStringTableFragment()->doneAppending();
   }
   return Ret;
 }
@@ -622,11 +623,12 @@ void CodeViewContext::encodeInlineLineTable(MCAsmLayout &Layout,
 void CodeViewContext::encodeDefRange(MCAsmLayout &Layout,
                                      MCCVDefRangeFragment &Frag) {
   MCContext &Ctx = Layout.getAssembler().getContext();
-  SmallVectorImpl<char> &Contents = Frag.getContents();
-  Contents.clear();
+  Frag.clearContents();
   SmallVectorImpl<MCFixup> &Fixups = Frag.getFixups();
   Fixups.clear();
-  raw_svector_ostream OS(Contents);
+  raw_svector_ostream OS(Frag.getContentsForAppending());
+
+  size_t StartByte = OS.tell();
 
   // Compute all the sizes up front.
   SmallVector<std::pair<unsigned, unsigned>, 4> GapAndRangeSizes;
@@ -679,10 +681,10 @@ void CodeViewContext::encodeDefRange(MCAsmLayout &Layout,
       OS << FixedSizePortion;
       // Make space for a fixup that will eventually have a section relative
       // relocation pointing at the offset where the variable becomes live.
-      Fixups.push_back(MCFixup::create(Contents.size(), BE, FK_SecRel_4));
+      Fixups.push_back(MCFixup::create(OS.tell() - StartByte, BE, FK_SecRel_4));
       LEWriter.write<uint32_t>(0); // Fixup for code start.
       // Make space for a fixup that will record the section index for the code.
-      Fixups.push_back(MCFixup::create(Contents.size(), BE, FK_SecRel_2));
+      Fixups.push_back(MCFixup::create(OS.tell() - StartByte, BE, FK_SecRel_2));
       LEWriter.write<uint16_t>(0); // Fixup for section index.
       // Write down the range's extent.
       LEWriter.write<uint16_t>(Chunk);
@@ -705,4 +707,6 @@ void CodeViewContext::encodeDefRange(MCAsmLayout &Layout,
       GapStartOffset += GapSize + RangeSize;
     }
   }
+
+  Frag.doneAppending();
 }

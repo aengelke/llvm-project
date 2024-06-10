@@ -101,6 +101,15 @@ private:
   /// below that number.
   SmallVector<std::pair<unsigned, MCFragment *>, 1> SubsectionFragmentMap;
 
+  // FIXME: temporary hack for MCFragment access
+public:
+  // Content storage for fragments
+  SmallVector<char> ContentStorage;
+
+  // Fixup storage for fragments
+  SmallVector<MCFixup> FixupStorage;
+private:
+
   /// State for tracking labels that don't yet have Fragments
   struct PendingLabel {
     MCSymbol* Sym;

@@ -72,7 +72,7 @@ void MCELFStreamer::mergeFragment(MCDataFragment *DF,
       EF->setBundlePadding(static_cast<uint8_t>(RequiredBundlePadding));
       Assembler.writeFragmentPadding(VecOS, *EF, FSize);
 
-      DF->getContents().append(Code.begin(), Code.end());
+      DF->appendContents(Code);
     }
   }
 
@@ -85,7 +85,7 @@ void MCELFStreamer::mergeFragment(MCDataFragment *DF,
   }
   if (DF->getSubtargetInfo() == nullptr && EF->getSubtargetInfo())
     DF->setHasInstructions(*EF->getSubtargetInfo());
-  DF->getContents().append(EF->getContents().begin(), EF->getContents().end());
+  DF->appendContents(EF->getContents());
 }
 
 void MCELFStreamer::initSections(bool NoExecStack, const MCSubtargetInfo &STI) {
@@ -598,7 +598,7 @@ void MCELFStreamer::emitInstToData(const MCInst &Inst,
       // there are no fixups registered.
       MCCompactEncodedInstFragment *CEIF = new MCCompactEncodedInstFragment();
       insert(CEIF);
-      CEIF->getContents().append(Code.begin(), Code.end());
+      CEIF->appendContents(Code);
       CEIF->setHasInstructions(STI);
       return;
     } else {
@@ -630,7 +630,7 @@ void MCELFStreamer::emitInstToData(const MCInst &Inst,
   if (!Fixups.empty() && Fixups.back().getTargetKind() ==
                              getAssembler().getBackend().RelaxFixupKind)
     DF->setLinkerRelaxable();
-  DF->getContents().append(Code.begin(), Code.end());
+  DF->appendContents(Code);
 
   if (Assembler.isBundlingEnabled() && Assembler.getRelaxAll()) {
     if (!isBundleLocked()) {

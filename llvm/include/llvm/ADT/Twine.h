@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 namespace llvm {
 
@@ -270,10 +271,20 @@ namespace llvm {
     /// We take care here to optimize "" into the empty twine -- this will be
     /// optimized out for string constants. This allows Twine arguments have
     /// default "" values, without introducing unnecessary string constants.
-    /*implicit*/ Twine(const char *Str) {
+    template <class T, std::enable_if_t<
+                           std::is_same_v<std::decay_t<T>, const char *> ||
+                           std::is_same_v<std::decay_t<T>, char *>> * = nullptr>
+    /*implicit*/ Twine(T &&Str) {
       if (Str[0] != '\0') {
-        LHS.cString = Str;
-        LHSKind = CStringKind;
+        using V = std::remove_reference_t<T>;
+        if constexpr (std::is_array_v<V>) {
+          LHS.ptrAndLength.ptr = Str;
+          LHS.ptrAndLength.length = StringRef(Str).size();
+          LHSKind = PtrAndLengthKind;
+        } else {
+          LHS.cString = Str;
+          LHSKind = CStringKind;
+        }
       } else
         LHSKind = EmptyKind;
 

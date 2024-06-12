@@ -272,8 +272,9 @@ namespace llvm {
     /// default "" values, without introducing unnecessary string constants.
     /*implicit*/ Twine(const char *Str) {
       if (Str[0] != '\0') {
-        LHS.cString = Str;
-        LHSKind = CStringKind;
+        LHS.ptrAndLength.ptr = Str;
+        LHS.ptrAndLength.length = StringRef(Str).size();
+        LHSKind = PtrAndLengthKind;
       } else
         LHSKind = EmptyKind;
 

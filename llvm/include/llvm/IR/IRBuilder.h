@@ -1805,11 +1805,6 @@ public:
   }
 
   LoadInst *CreateAlignedLoad(Type *Ty, Value *Ptr, MaybeAlign Align,
-                              const char *Name) {
-    return CreateAlignedLoad(Ty, Ptr, Align, /*isVolatile*/false, Name);
-  }
-
-  LoadInst *CreateAlignedLoad(Type *Ty, Value *Ptr, MaybeAlign Align,
                               const Twine &Name = "") {
     return CreateAlignedLoad(Ty, Ptr, Align, /*isVolatile*/false, Name);
   }

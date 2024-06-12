@@ -67,7 +67,7 @@ Expected<opt::InputArgList> COFFDirectiveParser::parse(StringRef Str) {
 
   if (missingCount)
     return make_error<JITLinkError>(Twine("COFF directive parsing failed: ") +
-                                    Result.getArgString(missingIndex) +
+                                    StringRef(Result.getArgString(missingIndex)) +
                                     " missing argument");
   LLVM_DEBUG({
     for (auto *arg : Result.filtered(COFF_OPT_UNKNOWN))

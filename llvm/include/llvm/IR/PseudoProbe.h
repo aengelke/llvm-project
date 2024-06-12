@@ -13,6 +13,7 @@
 #ifndef LLVM_IR_PSEUDOPROBE_H
 #define LLVM_IR_PSEUDOPROBE_H
 
+#include "llvm/ADT/StringRef.h"
 #include <cassert>
 #include <cstdint>
 #include <limits>
@@ -22,7 +23,7 @@ namespace llvm {
 
 class Instruction;
 
-constexpr const char *PseudoProbeDescMetadataName = "llvm.pseudo_probe_desc";
+constexpr StringLiteral PseudoProbeDescMetadataName = "llvm.pseudo_probe_desc";
 
 enum class PseudoProbeReservedId { Invalid = 0, Last = Invalid };
 

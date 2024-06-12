@@ -115,7 +115,7 @@ int MCRegisterInfo::getCodeViewRegNum(MCRegister RegNum) const {
   const DenseMap<MCRegister, int>::const_iterator I = L2CVRegs.find(RegNum);
   if (I == L2CVRegs.end())
     report_fatal_error("unknown codeview register " + (RegNum < getNumRegs()
-                                                           ? getName(RegNum)
+                                                           ? StringRef(getName(RegNum))
                                                            : Twine(RegNum)));
   return I->second;
 }

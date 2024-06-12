@@ -477,7 +477,7 @@ MCSymbol *EHStreamer::emitExceptionTable() {
                                       Twine(Asm->getFunctionNumber()));
   Asm->OutStreamer->emitLabel(GCCETSym);
   MCSymbol *CstEndLabel = Asm->createTempSymbol(
-      CallSiteRanges.size() > 1 ? "action_table_base" : "cst_end");
+      CallSiteRanges.size() > 1 ? StringRef("action_table_base") : StringRef("cst_end"));
 
   MCSymbol *TTBaseLabel = nullptr;
   if (HaveTTData)

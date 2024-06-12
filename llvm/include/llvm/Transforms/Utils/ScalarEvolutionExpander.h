@@ -65,7 +65,7 @@ class SCEVExpander : public SCEVVisitor<SCEVExpander, Value *> {
   const DataLayout &DL;
 
   // New instructions receive a name to identify them with the current pass.
-  const char *IVName;
+  StringRef IVName;
 
   /// Indicates whether LCSSA phis should be created for inserted values.
   bool PreserveLCSSA;
@@ -176,7 +176,7 @@ class SCEVExpander : public SCEVVisitor<SCEVExpander, Value *> {
 public:
   /// Construct a SCEVExpander in "canonical" mode.
   explicit SCEVExpander(ScalarEvolution &se, const DataLayout &DL,
-                        const char *name, bool PreserveLCSSA = true)
+                        StringRef name, bool PreserveLCSSA = true)
       : SE(se), DL(DL), IVName(name), PreserveLCSSA(PreserveLCSSA),
         IVIncInsertLoop(nullptr), IVIncInsertPos(nullptr), CanonicalMode(true),
         LSRMode(false),

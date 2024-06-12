@@ -490,7 +490,7 @@ std::string Attribute::getAsString(bool InAttrGrp) const {
                       : "align " + Twine(getValueAsInt()))
         .str();
 
-  auto AttrWithBytesToString = [&](const char *Name) {
+  auto AttrWithBytesToString = [&](StringRef Name) {
     return (InAttrGrp ? Name + ("=" + Twine(getValueAsInt()))
                       : Name + ("(" + Twine(getValueAsInt())) + ")")
         .str();

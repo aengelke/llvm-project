@@ -2494,7 +2494,7 @@ bool AsmPrinter::doFinalization(Module &M) {
       OutStreamer->emitSymbolAttribute(getSymbol(&GO), MCSA_WeakReference);
     }
     if (shouldEmitWeakSwiftAsyncExtendedFramePointerFlags()) {
-      auto SymbolName = "swift_async_extendedFramePointerFlags";
+      StringRef SymbolName = "swift_async_extendedFramePointerFlags";
       auto Global = M.getGlobalVariable(SymbolName);
       if (!Global) {
         auto Int8PtrTy = PointerType::getUnqual(M.getContext());
@@ -3090,7 +3090,7 @@ void AsmPrinter::emitInt32(int Value) const { OutStreamer->emitInt32(Value); }
 /// EmitSLEB128 - emit the specified signed leb128 value.
 void AsmPrinter::emitSLEB128(int64_t Value, const char *Desc) const {
   if (isVerbose() && Desc)
-    OutStreamer->AddComment(Desc);
+    OutStreamer->AddComment(StringRef(Desc));
 
   OutStreamer->emitSLEB128IntValue(Value);
 }
@@ -3098,7 +3098,7 @@ void AsmPrinter::emitSLEB128(int64_t Value, const char *Desc) const {
 void AsmPrinter::emitULEB128(uint64_t Value, const char *Desc,
                              unsigned PadTo) const {
   if (isVerbose() && Desc)
-    OutStreamer->AddComment(Desc);
+    OutStreamer->AddComment(StringRef(Desc));
 
   OutStreamer->emitULEB128IntValue(Value, PadTo);
 }

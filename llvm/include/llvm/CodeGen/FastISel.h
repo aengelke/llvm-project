@@ -496,7 +496,7 @@ protected:
   CmpInst::Predicate optimizeCmpPredicate(const CmpInst *CI) const;
 
   bool lowerCallTo(const CallInst *CI, MCSymbol *Symbol, unsigned NumArgs);
-  bool lowerCallTo(const CallInst *CI, const char *SymName,
+  bool lowerCallTo(const CallInst *CI, StringRef SymName,
                    unsigned NumArgs);
   bool lowerCallTo(CallLoweringInfo &CLI);
 

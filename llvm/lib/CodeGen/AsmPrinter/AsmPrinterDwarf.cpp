@@ -87,13 +87,13 @@ static const char *DecodeDWARFEncoding(unsigned Encoding) {
 /// encoding.  If verbose assembly output is enabled, we output comments
 /// describing the encoding.  Desc is an optional string saying what the
 /// encoding is specifying (e.g. "LSDA").
-void AsmPrinter::emitEncodingByte(unsigned Val, const char *Desc) const {
+void AsmPrinter::emitEncodingByte(unsigned Val, StringRef Desc) const {
   if (isVerbose()) {
-    if (Desc)
+    if (!Desc.empty())
       OutStreamer->AddComment(Twine(Desc) + " Encoding = " +
-                              Twine(DecodeDWARFEncoding(Val)));
+                              StringRef(DecodeDWARFEncoding(Val)));
     else
-      OutStreamer->AddComment(Twine("Encoding = ") + DecodeDWARFEncoding(Val));
+      OutStreamer->AddComment(Twine("Encoding = ") + StringRef(DecodeDWARFEncoding(Val)));
   }
 
   OutStreamer->emitIntValue(Val, 1);

@@ -1785,7 +1785,7 @@ void DwarfUnit::emitCommonHeader(bool UseOffsets, dwarf::UnitType UT) {
   // Emit size of content not including length itself
   if (!DD->useSectionsAsReferences())
     EndLabel = Asm->emitDwarfUnitLength(
-        isDwoUnit() ? "debug_info_dwo" : "debug_info", "Length of Unit");
+        isDwoUnit() ? StringRef("debug_info_dwo") : StringRef("debug_info"), "Length of Unit");
   else
     Asm->emitDwarfUnitLength(getHeaderSize() + getUnitDie().getSize(),
                              "Length of Unit");

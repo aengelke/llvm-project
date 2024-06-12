@@ -51,7 +51,7 @@ Error Decompressor::consumeCompressedHeader(bool Is64Bit, bool IsLittleEndian) {
   }
   if (const char *Reason = llvm::compression::getReasonIfUnsupported(
           compression::formatFor(CompressionType)))
-    return createError(Reason);
+    return createError(StringRef(Reason));
 
   // Skip Elf64_Chdr::ch_reserved field.
   if (Is64Bit)

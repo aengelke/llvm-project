@@ -1234,7 +1234,7 @@ CallInst *CodeExtractor::emitCallAndSwitchStatement(Function *newFunction,
 
   // Emit the call to the function
   call = CallInst::Create(newFunction, params,
-                          NumExitBlocks > 1 ? "targetBlock" : "");
+                          StringRef(NumExitBlocks > 1 ? "targetBlock" : ""));
   // Add debug location to the new call, if the original function has debug
   // info. In that case, the terminator of the entry block of the extracted
   // function contains the first debug location of the extracted function,

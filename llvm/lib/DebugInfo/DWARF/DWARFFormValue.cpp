@@ -625,7 +625,7 @@ Expected<const char *> DWARFFormValue::getAsCString() const {
   if (Index)
     Msg += (" uses index " + Twine(*Index) + ", but the referenced string").str();
   Msg += (" offset " + Twine(Offset) + " is beyond " +
-          (IsDebugLineString ? ".debug_line_str" : ".debug_str") + " bounds")
+          (IsDebugLineString ? Twine(".debug_line_str") : Twine(".debug_str")) + " bounds")
              .str();
   return make_error<StringError>(Msg,
       inconvertibleErrorCode());

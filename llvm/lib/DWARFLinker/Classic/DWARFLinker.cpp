@@ -175,7 +175,7 @@ bool DWARFLinker::DIECloner::getDIENames(const DWARFDie &Die,
 /// Resolve the relative path to a build artifact referenced by DWARF by
 /// applying DW_AT_comp_dir.
 static void resolveRelativeObjectPath(SmallVectorImpl<char> &Buf, DWARFDie CU) {
-  sys::path::append(Buf, dwarf::toString(CU.find(dwarf::DW_AT_comp_dir), ""));
+  sys::path::append(Buf, StringRef(dwarf::toString(CU.find(dwarf::DW_AT_comp_dir), "")));
 }
 
 /// Collect references to parseable Swift interfaces in imported
@@ -219,7 +219,7 @@ static void analyzeImportedModule(
   sys::path::append(ResolvedPath, Path);
   if (!Entry.empty() && Entry != ResolvedPath)
     ReportWarning(Twine("Conflicting parseable interfaces for Swift Module ") +
-                      *Name + ": " + Entry + " and " + Path,
+                      StringRef(*Name) + ": " + Entry + " and " + Path,
                   DIE);
   Entry = std::string(ResolvedPath);
 }

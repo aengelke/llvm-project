@@ -643,7 +643,7 @@ void CompressInstEmitter::emitCompressInstEmitter(raw_ostream &OS,
   std::string ValidatorName =
       CompressOrUncompress
           ? (TargetName + "ValidateMCOperandFor" +
-             (EType == EmitterType::Compress ? "Compress" : "Uncompress"))
+             (EType == EmitterType::Compress ? Twine("Compress") : Twine("Uncompress")))
                 .str()
           : "";
 

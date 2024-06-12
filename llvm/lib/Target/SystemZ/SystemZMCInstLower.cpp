@@ -48,7 +48,7 @@ SystemZMCInstLower::getExpr(const MachineOperand &MO,
     break;
 
   case MachineOperand::MO_ExternalSymbol:
-    Symbol = AsmPrinter.GetExternalSymbolSymbol(MO.getSymbolName());
+    Symbol = AsmPrinter.GetExternalSymbolSymbol(StringRef(MO.getSymbolName()));
     break;
 
   case MachineOperand::MO_JumpTableIndex:

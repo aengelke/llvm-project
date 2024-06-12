@@ -272,8 +272,8 @@ RegScavenger::spill(Register Reg, const TargetRegisterClass &RC, int SPAdj,
     int FI = Scavenged[SI].FrameIndex;
     if (FI < FIB || FI >= FIE) {
       report_fatal_error(Twine("Error while trying to spill ") +
-                         TRI->getName(Reg) + " from class " +
-                         TRI->getRegClassName(&RC) +
+                         StringRef(TRI->getName(Reg)) + " from class " +
+                         StringRef(TRI->getRegClassName(&RC)) +
                          ": Cannot scavenge register without an emergency "
                          "spill slot!");
     }

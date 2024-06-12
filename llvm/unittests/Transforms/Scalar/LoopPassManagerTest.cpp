@@ -916,7 +916,7 @@ TEST_F(LoopPassManagerTest, LoopChildInsertion) {
   ASSERT_THAT(EndBB, HasName("end"));
   ASSERT_THAT(BBI, F.end());
   auto CreateCondBr = [&](BasicBlock *TrueBB, BasicBlock *FalseBB,
-                          const char *Name, BasicBlock *BB) {
+                          StringRef Name, BasicBlock *BB) {
     auto *Cond = new LoadInst(Type::getInt1Ty(Context), &Ptr, Name,
                               /*isVolatile*/ true, BB);
     BranchInst::Create(TrueBB, FalseBB, Cond, BB);
@@ -1119,7 +1119,7 @@ TEST_F(LoopPassManagerTest, LoopPeerInsertion) {
   ASSERT_THAT(EndBB, HasName("end"));
   ASSERT_THAT(BBI, F.end());
   auto CreateCondBr = [&](BasicBlock *TrueBB, BasicBlock *FalseBB,
-                          const char *Name, BasicBlock *BB) {
+                          StringRef Name, BasicBlock *BB) {
     auto *Cond = new LoadInst(Type::getInt1Ty(Context), &Ptr, Name,
                               /*isVolatile*/ true, BB);
     BranchInst::Create(TrueBB, FalseBB, Cond, BB);

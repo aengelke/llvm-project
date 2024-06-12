@@ -953,7 +953,7 @@ static AttributeList getReturnAttrs(FastISel::CallLoweringInfo &CLI) {
                             Attrs);
 }
 
-bool FastISel::lowerCallTo(const CallInst *CI, const char *SymName,
+bool FastISel::lowerCallTo(const CallInst *CI, StringRef SymName,
                            unsigned NumArgs) {
   MCContext &Ctx = MF->getContext();
   SmallString<32> MangledName;

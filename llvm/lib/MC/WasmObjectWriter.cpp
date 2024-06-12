@@ -590,7 +590,7 @@ void WasmObjectWriter::recordRelocation(MCAssembler &Asm,
       Type == wasm::R_WASM_TABLE_INDEX_I64) {
     // TABLE_INDEX relocs implicitly use the default indirect function table.
     // We require the function table to have already been defined.
-    auto TableName = "__indirect_function_table";
+    StringRef TableName = "__indirect_function_table";
     MCSymbolWasm *Sym = cast_or_null<MCSymbolWasm>(Ctx.lookupSymbol(TableName));
     if (!Sym) {
       report_fatal_error("missing indirect function table symbol");

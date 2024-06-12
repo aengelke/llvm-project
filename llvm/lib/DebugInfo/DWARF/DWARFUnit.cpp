@@ -615,11 +615,11 @@ bool DWARFUnit::parseDWO(StringRef DWOAlternativeLocation) {
     return false;
   auto CompilationDir = dwarf::toString(UnitDie.find(DW_AT_comp_dir));
   SmallString<16> AbsolutePath;
-  if (sys::path::is_relative(*DWOFileName) && CompilationDir &&
+  if (sys::path::is_relative(StringRef(*DWOFileName)) && CompilationDir &&
       *CompilationDir) {
-    sys::path::append(AbsolutePath, *CompilationDir);
+    sys::path::append(AbsolutePath, StringRef(*CompilationDir));
   }
-  sys::path::append(AbsolutePath, *DWOFileName);
+  sys::path::append(AbsolutePath, StringRef(*DWOFileName));
   auto DWOId = getDWOId();
   if (!DWOId)
     return false;

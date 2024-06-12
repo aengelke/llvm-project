@@ -60,7 +60,7 @@ public:
     }
 
     std::string getDescription() const {
-      return (Twine(IsArg ? "Argument #" : "Return value #") + Twine(Idx) +
+      return ((IsArg ? Twine("Argument #") : Twine("Return value #")) + Twine(Idx) +
               " of function " + F->getName())
           .str();
     }

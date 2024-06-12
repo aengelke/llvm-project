@@ -375,7 +375,7 @@ Function *createRegisterGlobalsFunction(Module &M, bool IsHIP,
                                          /*isVarArg*/ false);
   auto *RegGlobalsFn =
       Function::Create(RegGlobalsTy, GlobalValue::InternalLinkage,
-                       IsHIP ? ".hip.globals_reg" : ".cuda.globals_reg", &M);
+                       IsHIP ? StringRef(".hip.globals_reg") : StringRef(".cuda.globals_reg"), &M);
   RegGlobalsFn->setSection(".text.startup");
 
   // Create the loop to register all the entries.

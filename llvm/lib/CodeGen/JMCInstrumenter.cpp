@@ -133,7 +133,7 @@ FunctionType *getCheckFunctionType(LLVMContext &Ctx) {
 
 Function *createDefaultCheckFunction(Module &M, bool UseX86FastCall) {
   LLVMContext &Ctx = M.getContext();
-  const char *DefaultCheckFunctionName =
+  StringRef DefaultCheckFunctionName =
       UseX86FastCall ? "_JustMyCode_Default" : "__JustMyCode_Default";
   // Create the function.
   Function *DefaultCheckFunc =

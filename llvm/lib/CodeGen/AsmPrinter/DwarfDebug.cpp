@@ -174,8 +174,8 @@ static constexpr unsigned ULEB128PadSize = 4;
 
 void DebugLocDwarfExpression::emitOp(uint8_t Op, const char *Comment) {
   getActiveStreamer().emitInt8(
-      Op, Comment ? Twine(Comment) + " " + dwarf::OperationEncodingString(Op)
-                  : dwarf::OperationEncodingString(Op));
+      Op, Comment ? StringRef(Comment) + " " + StringRef(dwarf::OperationEncodingString(Op))
+                  : StringRef(dwarf::OperationEncodingString(Op)));
 }
 
 void DebugLocDwarfExpression::emitSigned(int64_t Value) {
@@ -218,8 +218,8 @@ void DebugLocDwarfExpression::commitTemporaryBuffer() {
   if (!TmpBuf)
     return;
   for (auto Byte : enumerate(TmpBuf->Bytes)) {
-    const char *Comment = (Byte.index() < TmpBuf->Comments.size())
-                              ? TmpBuf->Comments[Byte.index()].c_str()
+    StringRef Comment = (Byte.index() < TmpBuf->Comments.size())
+                              ? TmpBuf->Comments[Byte.index()]
                               : "";
     OutBS.emitInt8(Byte.value(), Comment);
   }

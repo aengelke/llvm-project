@@ -183,7 +183,7 @@ SystemZAsmPrinter::AssociatedDataAreaTable::insert(const MachineOperand MO) {
     assert(Sym && "No symbol");
   } else if (MO.getType() == MachineOperand::MO_ExternalSymbol) {
     const char *SymName = MO.getSymbolName();
-    Sym = MO.getParent()->getMF()->getContext().getOrCreateSymbol(SymName);
+    Sym = MO.getParent()->getMF()->getContext().getOrCreateSymbol(StringRef(SymName));
     assert(Sym && "No symbol");
   } else
     llvm_unreachable("Unexpected operand type");
@@ -1431,7 +1431,7 @@ void SystemZAsmPrinter::emitPPA2(Module &M) {
   OutStreamer->switchSection(getObjFileLowering().getPPA2Section());
   MCContext &OutContext = OutStreamer->getContext();
   // Make CELQSTRT symbol.
-  const char *StartSymbolName = "CELQSTRT";
+  StringRef StartSymbolName = "CELQSTRT";
   MCSymbol *CELQSTRT = OutContext.getOrCreateSymbol(StartSymbolName);
 
   // Create symbol and assign to class field for use in PPA1.

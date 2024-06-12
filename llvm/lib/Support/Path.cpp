@@ -178,12 +178,13 @@ createUniqueEntity(const Twine &Model, int &ResultFD,
   // different name) or for the whole directory (retry would always fail).
   // Checking which is racy, so we try a number of times, then give up.
   std::error_code EC;
+  StringRef ResultPathStr(ResultPath.data(), ResultPath.size());
   for (int Retries = 128; Retries > 0; --Retries) {
     sys::fs::createUniquePath(Model, ResultPath, MakeAbsolute);
     // Try to open + create the file.
     switch (Type) {
     case FS_File: {
-      EC = sys::fs::openFileForReadWrite(Twine(ResultPath.begin()), ResultFD,
+      EC = sys::fs::openFileForReadWrite(ResultPathStr, ResultFD,
                                          sys::fs::CD_CreateNew, Flags, Mode);
       if (EC) {
         // errc::permission_denied happens on Windows when we try to open a file
@@ -197,7 +198,7 @@ createUniqueEntity(const Twine &Model, int &ResultFD,
     }
 
     case FS_Name: {
-      EC = sys::fs::access(ResultPath.begin(), sys::fs::AccessMode::Exist);
+      EC = sys::fs::access(ResultPathStr, sys::fs::AccessMode::Exist);
       if (EC == errc::no_such_file_or_directory)
         return std::error_code();
       if (EC)
@@ -206,7 +207,7 @@ createUniqueEntity(const Twine &Model, int &ResultFD,
     }
 
     case FS_Dir: {
-      EC = sys::fs::create_directory(ResultPath.begin(), false);
+      EC = sys::fs::create_directory(ResultPathStr, false);
       if (EC) {
         if (EC == errc::file_exists)
           continue;
@@ -848,7 +849,8 @@ createTemporaryFile(const Twine &Model, int &ResultFD,
   assert(P.find_first_of(separators(Style::native)) == StringRef::npos &&
          "Model must be a simple filename.");
   // Use P.begin() so that createUniqueEntity doesn't need to recreate Storage.
-  return createUniqueEntity(P.begin(), ResultFD, ResultPath, true, Type, Flags,
+  // XXX: What? Why?
+  return createUniqueEntity(Twine(P), ResultFD, ResultPath, true, Type, Flags,
                             all_read | all_write);
 }
 
@@ -856,7 +858,7 @@ static std::error_code
 createTemporaryFile(const Twine &Prefix, StringRef Suffix, int &ResultFD,
                     llvm::SmallVectorImpl<char> &ResultPath, FSEntity Type,
                     sys::fs::OpenFlags Flags = sys::fs::OF_None) {
-  const char *Middle = Suffix.empty() ? "-%%%%%%" : "-%%%%%%.";
+  StringRef Middle = Suffix.empty() ? "-%%%%%%" : "-%%%%%%.";
   return createTemporaryFile(Prefix + Middle + Suffix, ResultFD, ResultPath,
                              Type, Flags);
 }

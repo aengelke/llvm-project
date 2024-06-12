@@ -79,10 +79,10 @@ private:
 
   static GetElementPtrInst *CreateGEP(LLVMContext &Context, IRBuilder<> &B,
                                       Type *Ty, Value *BasePtr, int Idx1,
-                                      const char *Name);
+                                      StringRef Name);
   static GetElementPtrInst *CreateGEP(LLVMContext &Context, IRBuilder<> &B,
                                       Type *Ty, Value *BasePtr, int Idx1, int Idx2,
-                                      const char *Name);
+                                      StringRef Name);
 };
 
 class ShadowStackGCLowering : public FunctionPass {
@@ -303,7 +303,7 @@ void ShadowStackGCLoweringImpl::CollectRoots(Function &F) {
 GetElementPtrInst *
 ShadowStackGCLoweringImpl::CreateGEP(LLVMContext &Context, IRBuilder<> &B,
                                      Type *Ty, Value *BasePtr, int Idx,
-                                     int Idx2, const char *Name) {
+                                     int Idx2, StringRef Name) {
   Value *Indices[] = {ConstantInt::get(Type::getInt32Ty(Context), 0),
                       ConstantInt::get(Type::getInt32Ty(Context), Idx),
                       ConstantInt::get(Type::getInt32Ty(Context), Idx2)};
@@ -318,7 +318,7 @@ GetElementPtrInst *ShadowStackGCLoweringImpl::CreateGEP(LLVMContext &Context,
                                                         IRBuilder<> &B,
                                                         Type *Ty,
                                                         Value *BasePtr, int Idx,
-                                                        const char *Name) {
+                                                        StringRef Name) {
   Value *Indices[] = {ConstantInt::get(Type::getInt32Ty(Context), 0),
                       ConstantInt::get(Type::getInt32Ty(Context), Idx)};
   Value *Val = B.CreateGEP(Ty, BasePtr, Indices, Name);

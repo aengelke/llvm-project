@@ -446,7 +446,7 @@ public:
     setupLDVObj(&*MF);
   }
 
-  MachineFunction *readMIRBlock(const char *Input) {
+  MachineFunction *readMIRBlock(StringRef Input) {
     MIRStr.clear();
     StringRef S = Twine(Twine(R"MIR(
 --- |

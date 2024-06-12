@@ -215,7 +215,7 @@ unsigned AArch64ELFObjectWriter::getRelocType(MCContext &Ctx,
                      RefKind == AArch64MCExpr::VK_AUTHADDR);
       if (IsILP32) {
         Ctx.reportError(Fixup.getLoc(),
-                        Twine("ILP32 8 byte absolute data "
+                        StringRef("ILP32 8 byte absolute data "
                               "relocation not supported (LP64 eqv: ") +
                             (IsAuth ? "AUTH_ABS64" : "ABS64") + Twine(')'));
         return ELF::R_AARCH64_NONE;

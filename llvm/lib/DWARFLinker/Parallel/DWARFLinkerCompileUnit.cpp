@@ -288,11 +288,11 @@ void CompileUnit::analyzeImportedModule(const DWARFDebugInfoEntry *DieEntry) {
     if (sys::path::is_relative(Path))
       sys::path::append(
           ResolvedPath,
-          dwarf::toString(getUnitDIE().find(dwarf::DW_AT_comp_dir), ""));
+          StringRef(dwarf::toString(getUnitDIE().find(dwarf::DW_AT_comp_dir), "")));
     sys::path::append(ResolvedPath, Path);
     if (!Entry.empty() && Entry != ResolvedPath) {
       DWARFDie Die = getDIE(DieEntry);
-      warn(Twine("conflicting parseable interfaces for Swift Module ") + *Name +
+      warn(Twine("conflicting parseable interfaces for Swift Module ") + StringRef(*Name) +
                ": " + Entry + " and " + Path + ".",
            &Die);
     }

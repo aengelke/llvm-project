@@ -324,7 +324,7 @@ static void diagnosePossiblyInvalidConstraint(LLVMContext &Ctx, const Value *V,
   if (!V)
     return Ctx.emitError(ErrMsg);
 
-  const char *AsmError = ", possible invalid constraint for vector type";
+  StringRef AsmError = ", possible invalid constraint for vector type";
   if (const CallInst *CI = dyn_cast<CallInst>(I))
     if (CI->isInlineAsm())
       return Ctx.emitError(I, ErrMsg + AsmError);

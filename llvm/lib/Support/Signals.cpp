@@ -182,8 +182,8 @@ static bool printSymbolizedStackTrace(StringRef Argv0, void **StackTrace,
   SmallString<32> InputFile, OutputFile;
   sys::fs::createTemporaryFile("symbolizer-input", "", InputFD, InputFile);
   sys::fs::createTemporaryFile("symbolizer-output", "", OutputFile);
-  FileRemover InputRemover(InputFile.c_str());
-  FileRemover OutputRemover(OutputFile.c_str());
+  FileRemover InputRemover(InputFile);
+  FileRemover OutputRemover(OutputFile);
 
   {
     raw_fd_ostream Input(InputFD, true);
@@ -210,7 +210,7 @@ static bool printSymbolizedStackTrace(StringRef Argv0, void **StackTrace,
 
   // This report format is based on the sanitizer stack trace printer.  See
   // sanitizer_stacktrace_printer.cc in compiler-rt.
-  auto OutputBuf = MemoryBuffer::getFile(OutputFile.c_str());
+  auto OutputBuf = MemoryBuffer::getFile(OutputFile);
   if (!OutputBuf)
     return false;
   StringRef Output = OutputBuf.get()->getBuffer();

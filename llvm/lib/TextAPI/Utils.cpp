@@ -47,7 +47,7 @@ std::error_code llvm::MachO::shouldSkipSymLink(const Twine &Path,
   SmallString<PATH_MAX> Storage;
   auto P = Path.toNullTerminatedStringRef(Storage);
   sys::fs::file_status Stat1;
-  auto EC = sys::fs::status(P.data(), Stat1);
+  auto EC = sys::fs::status(P, Stat1);
   if (EC == std::errc::too_many_symbolic_link_levels) {
     Result = true;
     return {};

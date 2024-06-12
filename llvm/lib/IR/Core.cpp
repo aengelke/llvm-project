@@ -2113,20 +2113,20 @@ void LLVMGlobalClearMetadata(LLVMValueRef Global) {
 
 LLVMValueRef LLVMAddGlobal(LLVMModuleRef M, LLVMTypeRef Ty, const char *Name) {
   return wrap(new GlobalVariable(*unwrap(M), unwrap(Ty), false,
-                                 GlobalValue::ExternalLinkage, nullptr, Name));
+                                 GlobalValue::ExternalLinkage, nullptr, StringRef(Name)));
 }
 
 LLVMValueRef LLVMAddGlobalInAddressSpace(LLVMModuleRef M, LLVMTypeRef Ty,
                                          const char *Name,
                                          unsigned AddressSpace) {
   return wrap(new GlobalVariable(*unwrap(M), unwrap(Ty), false,
-                                 GlobalValue::ExternalLinkage, nullptr, Name,
+                                 GlobalValue::ExternalLinkage, nullptr, StringRef(Name),
                                  nullptr, GlobalVariable::NotThreadLocal,
                                  AddressSpace));
 }
 
 LLVMValueRef LLVMGetNamedGlobal(LLVMModuleRef M, const char *Name) {
-  return wrap(unwrap(M)->getNamedGlobal(Name));
+  return wrap(unwrap(M)->getNamedGlobal(StringRef(Name)));
 }
 
 LLVMValueRef LLVMGetFirstGlobal(LLVMModuleRef M) {
@@ -2246,7 +2246,7 @@ LLVMValueRef LLVMAddAlias2(LLVMModuleRef M, LLVMTypeRef ValueTy,
                            unsigned AddrSpace, LLVMValueRef Aliasee,
                            const char *Name) {
   return wrap(GlobalAlias::create(unwrap(ValueTy), AddrSpace,
-                                  GlobalValue::ExternalLinkage, Name,
+                                  GlobalValue::ExternalLinkage, StringRef(Name),
                                   unwrap<Constant>(Aliasee), unwrap(M)));
 }
 
@@ -2300,11 +2300,11 @@ void LLVMAliasSetAliasee(LLVMValueRef Alias, LLVMValueRef Aliasee) {
 LLVMValueRef LLVMAddFunction(LLVMModuleRef M, const char *Name,
                              LLVMTypeRef FunctionTy) {
   return wrap(Function::Create(unwrap<FunctionType>(FunctionTy),
-                               GlobalValue::ExternalLinkage, Name, unwrap(M)));
+                               GlobalValue::ExternalLinkage, StringRef(Name), unwrap(M)));
 }
 
 LLVMValueRef LLVMGetNamedFunction(LLVMModuleRef M, const char *Name) {
-  return wrap(unwrap(M)->getFunction(Name));
+  return wrap(unwrap(M)->getFunction(StringRef(Name)));
 }
 
 LLVMValueRef LLVMGetFirstFunction(LLVMModuleRef M) {

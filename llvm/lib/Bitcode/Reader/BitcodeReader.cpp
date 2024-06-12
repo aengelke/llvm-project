@@ -1668,7 +1668,7 @@ Expected<Value *> BitcodeReader::materializeValue(unsigned StartValID,
     if (!InsertBB)
       return error(Twine("Value referenced by initializer is an unsupported "
                          "constant expression of type ") +
-                   BC->getOpcodeName());
+                   StringRef(BC->getOpcodeName()));
 
     // Materialize as instructions if necessary.
     Instruction *I;

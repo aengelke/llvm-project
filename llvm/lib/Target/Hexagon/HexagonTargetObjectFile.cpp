@@ -384,7 +384,7 @@ MCSection *HexagonTargetObjectFile::selectSmallSectionForGlobal(
     if (NoSmallDataSorting)
       return BSSSection;
 
-    Twine Name = Twine(".scommon") + getSectionSuffixForSize(Size);
+    Twine Name = StringRef(".scommon") + getSectionSuffixForSize(Size);
     TRACE(" small COMMON (" << Name << ")\n");
 
     return getContext().getELFSection(Name.str(), ELF::SHT_NOBITS,

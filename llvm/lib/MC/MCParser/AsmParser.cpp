@@ -4836,7 +4836,7 @@ bool AsmParser::parseDirectiveBundleLock() {
 
   StringRef Option;
   SMLoc Loc = getTok().getLoc();
-  const char *kInvalidOptionError =
+  StringRef kInvalidOptionError =
       "invalid option for '.bundle_lock' directive";
 
   if (!parseOptionalToken(AsmToken::EndOfStatement)) {

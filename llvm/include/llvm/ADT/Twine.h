@@ -270,10 +270,12 @@ namespace llvm {
     /// We take care here to optimize "" into the empty twine -- this will be
     /// optimized out for string constants. This allows Twine arguments have
     /// default "" values, without introducing unnecessary string constants.
-    /*implicit*/ Twine(const char *Str) {
-      if (Str[0] != '\0') {
-        LHS.cString = Str;
-        LHSKind = CStringKind;
+    template <size_t N>
+    /*implicit*/ Twine(const char (&Str)[N]) {
+      if (N != 1 || Str[0] != '\0') {
+        LHS.ptrAndLength.ptr = Str;
+	LHS.ptrAndLength.length = N - 1;
+        LHSKind = PtrAndLengthKind;
       } else
         LHSKind = EmptyKind;
 

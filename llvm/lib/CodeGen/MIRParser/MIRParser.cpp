@@ -708,7 +708,7 @@ bool MIRParserImpl::setupRegisterInfo(const PerFunctionMIParsingState &PFS,
     case VRegInfo::NORMAL:
       if (!Info.D.RC->isAllocatable()) {
         error(Twine("Cannot use non-allocatable class '") +
-              TRI->getRegClassName(Info.D.RC) + "' for virtual register " +
+              StringRef(TRI->getRegClassName(Info.D.RC)) + "' for virtual register " +
               Name + " in function '" + MF.getName() + "'");
         Error = true;
         break;

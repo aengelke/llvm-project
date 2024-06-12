@@ -89,7 +89,7 @@ unsigned AArch64WinCOFFObjectWriter::getRelocType(
                                           " unsupported on COFF targets");
     } else {
       const MCFixupKindInfo &Info = MAB.getFixupKindInfo(Fixup.getKind());
-      Ctx.reportError(Fixup.getLoc(), Twine("relocation type ") + Info.Name +
+      Ctx.reportError(Fixup.getLoc(), Twine("relocation type ") + StringRef(Info.Name) +
                                           " unsupported on COFF targets");
     }
     return COFF::IMAGE_REL_ARM64_ABSOLUTE; // Dummy return value

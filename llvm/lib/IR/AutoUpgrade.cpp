@@ -4931,7 +4931,7 @@ bool llvm::UpgradeDebugInfo(Module &M) {
 /// returns true if module is modified.
 static bool upgradeRetainReleaseMarker(Module &M) {
   bool Changed = false;
-  const char *MarkerKey = "clang.arc.retainAutoreleasedReturnValueMarker";
+  StringRef MarkerKey = "clang.arc.retainAutoreleasedReturnValueMarker";
   NamedMDNode *ModRetainReleaseMarker = M.getNamedMetadata(MarkerKey);
   if (ModRetainReleaseMarker) {
     MDNode *Op = ModRetainReleaseMarker->getOperand(0);

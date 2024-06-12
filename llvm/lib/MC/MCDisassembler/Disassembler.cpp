@@ -74,7 +74,7 @@ LLVMCreateDisasmCPUFeatures(const char *TT, const char *CPU,
 
   // Set up the MCContext for creating symbols and MCExpr's.
   std::unique_ptr<MCContext> Ctx(
-      new MCContext(Triple(TT), MAI.get(), MRI.get(), STI.get()));
+      new MCContext(Triple(StringRef(TT)), MAI.get(), MRI.get(), STI.get()));
   if (!Ctx)
     return nullptr;
 
@@ -96,7 +96,7 @@ LLVMCreateDisasmCPUFeatures(const char *TT, const char *CPU,
   // Set up the instruction printer.
   int AsmPrinterVariant = MAI->getAssemblerDialect();
   std::unique_ptr<MCInstPrinter> IP(TheTarget->createMCInstPrinter(
-      Triple(TT), AsmPrinterVariant, *MAI, *MII, *MRI));
+      Triple(StringRef(TT)), AsmPrinterVariant, *MAI, *MII, *MRI));
   if (!IP)
     return nullptr;
 

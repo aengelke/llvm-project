@@ -275,13 +275,13 @@ std::vector<std::string> RISCVISAInfo::toFeatures(bool AddAllExtensions,
     for (const RISCVSupportedExtension &Ext : SupportedExtensions) {
       if (Exts.count(Ext.Name))
         continue;
-      Features.push_back((llvm::Twine("-") + Ext.Name).str());
+      Features.push_back((llvm::Twine("-") + StringRef(Ext.Name)).str());
     }
 
     for (const RISCVSupportedExtension &Ext : SupportedExperimentalExtensions) {
       if (Exts.count(Ext.Name))
         continue;
-      Features.push_back((llvm::Twine("-experimental-") + Ext.Name).str());
+      Features.push_back((llvm::Twine("-experimental-") + StringRef(Ext.Name)).str());
     }
   }
   return Features;
@@ -831,8 +831,8 @@ Error RISCVISAInfo::checkDependency() {
       (HasC || Exts.count("zcd")))
     return createStringError(
         errc::invalid_argument,
-        Twine("'") + (HasZcmt ? "zcmt" : "zcmp") +
-        "' extension is incompatible with '" + (HasC ? "c" : "zcd") +
+        Twine("'") + (HasZcmt ? Twine("zcmt") : Twine("zcmp")) +
+        "' extension is incompatible with '" + (HasC ? Twine("c") : Twine("zcd")) +
         "' extension when 'd' extension is enabled");
 
   if (XLen != 32 && Exts.count("zcf"))

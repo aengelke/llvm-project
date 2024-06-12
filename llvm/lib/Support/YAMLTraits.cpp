@@ -173,7 +173,7 @@ bool Input::preflightKey(const char *Key, bool Required, bool, bool &UseDefault,
   HNode *Value = MN->Mapping[Key].first;
   if (!Value) {
     if (Required)
-      setError(CurrentNode, Twine("missing required key '") + Key + "'");
+      setError(CurrentNode, Twine("missing required key '") + StringRef(Key) + "'");
     else
       UseDefault = true;
     return false;

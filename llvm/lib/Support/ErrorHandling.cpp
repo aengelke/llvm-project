@@ -80,7 +80,7 @@ void llvm::remove_fatal_error_handler() {
 }
 
 void llvm::report_fatal_error(const char *Reason, bool GenCrashDiag) {
-  report_fatal_error(Twine(Reason), GenCrashDiag);
+  report_fatal_error(Twine(StringRef(Reason)), GenCrashDiag);
 }
 
 void llvm::report_fatal_error(StringRef Reason, bool GenCrashDiag) {

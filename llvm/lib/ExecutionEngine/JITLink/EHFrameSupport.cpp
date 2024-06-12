@@ -479,7 +479,7 @@ Expected<uint8_t> EHFrameEdgeFixer::readPointerEncoding(BinaryStreamReader &R,
 
   return make_error<JITLinkError>("Unsupported pointer encoding " +
                                   formatv("{0:x2}", PointerEncoding) + " for " +
-                                  FieldName + "in CFI record at " +
+                                  StringRef(FieldName) + "in CFI record at " +
                                   formatv("{0:x16}", InBlock.getAddress()));
 }
 

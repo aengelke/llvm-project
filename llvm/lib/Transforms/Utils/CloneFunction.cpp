@@ -93,11 +93,10 @@ void llvm::CloneFunctionInto(Function *NewFunc, const Function *OldFunc,
                              ValueToValueMapTy &VMap,
                              CloneFunctionChangeType Changes,
                              SmallVectorImpl<ReturnInst *> &Returns,
-                             const char *NameSuffix, ClonedCodeInfo *CodeInfo,
+                             StringRef NameSuffix, ClonedCodeInfo *CodeInfo,
                              ValueMapTypeRemapper *TypeMapper,
                              ValueMaterializer *Materializer) {
   NewFunc->setIsNewDbgInfoFormat(OldFunc->IsNewDbgInfoFormat);
-  assert(NameSuffix && "NameSuffix cannot be null!");
 
 #ifndef NDEBUG
   for (const Argument &I : OldFunc->args())
@@ -362,7 +361,7 @@ struct PruningFunctionCloner {
   const Function *OldFunc;
   ValueToValueMapTy &VMap;
   bool ModuleLevelChanges;
-  const char *NameSuffix;
+  StringRef NameSuffix;
   ClonedCodeInfo *CodeInfo;
   bool HostFuncIsStrictFP;
 
@@ -371,7 +370,7 @@ struct PruningFunctionCloner {
 public:
   PruningFunctionCloner(Function *newFunc, const Function *oldFunc,
                         ValueToValueMapTy &valueMap, bool moduleLevelChanges,
-                        const char *nameSuffix, ClonedCodeInfo *codeInfo)
+                        StringRef nameSuffix, ClonedCodeInfo *codeInfo)
       : NewFunc(newFunc), OldFunc(oldFunc), VMap(valueMap),
         ModuleLevelChanges(moduleLevelChanges), NameSuffix(nameSuffix),
         CodeInfo(codeInfo) {
@@ -651,10 +650,8 @@ void llvm::CloneAndPruneIntoFromInst(Function *NewFunc, const Function *OldFunc,
                                      ValueToValueMapTy &VMap,
                                      bool ModuleLevelChanges,
                                      SmallVectorImpl<ReturnInst *> &Returns,
-                                     const char *NameSuffix,
+                                     StringRef NameSuffix,
                                      ClonedCodeInfo *CodeInfo) {
-  assert(NameSuffix && "NameSuffix cannot be null!");
-
   ValueMapTypeRemapper *TypeMapper = nullptr;
   ValueMaterializer *Materializer = nullptr;
 

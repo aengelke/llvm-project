@@ -59,7 +59,7 @@ bool convertYAML(yaml::Input &YIn, raw_ostream &Out, ErrorHandler ErrHandler,
   } while (YIn.nextDocument());
 
   ErrHandler("cannot find the " + Twine(DocNum) +
-             getOrdinalSuffix(DocNum).data() + " document");
+             getOrdinalSuffix(DocNum) + " document");
   return false;
 }
 

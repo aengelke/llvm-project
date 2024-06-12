@@ -442,7 +442,7 @@ MCContext::createXCOFFSymbolImpl(const StringMapEntry<bool> *Name,
 MCSectionMachO *MCContext::getMachOSection(StringRef Segment, StringRef Section,
                                            unsigned TypeAndAttributes,
                                            unsigned Reserved2, SectionKind Kind,
-                                           const char *BeginSymName) {
+                                           StringRef BeginSymName) {
   // We unique sections by their segment/section pair.  The returned section
   // may not have the same flags as the requested section, if so this should be
   // diagnosed by the client as an error.
@@ -458,7 +458,7 @@ MCSectionMachO *MCContext::getMachOSection(StringRef Segment, StringRef Section,
     return R.first->second;
 
   MCSymbol *Begin = nullptr;
-  if (BeginSymName)
+  if (BeginSymName != "")
     Begin = createTempSymbol(BeginSymName, false);
 
   // Otherwise, return a new section.
@@ -704,7 +704,7 @@ MCSectionCOFF *MCContext::getCOFFSection(StringRef Section,
                                          SectionKind Kind,
                                          StringRef COMDATSymName, int Selection,
                                          unsigned UniqueID,
-                                         const char *BeginSymName) {
+                                         StringRef BeginSymName) {
   MCSymbol *COMDATSymbol = nullptr;
   if (!COMDATSymName.empty()) {
     COMDATSymbol = getOrCreateSymbol(COMDATSymName);
@@ -719,7 +719,7 @@ MCSectionCOFF *MCContext::getCOFFSection(StringRef Section,
     return Iter->second;
 
   MCSymbol *Begin = nullptr;
-  if (BeginSymName)
+  if (!BeginSymName.empty())
     Begin = createTempSymbol(BeginSymName, false);
 
   StringRef CachedName = Iter->first.SectionName;
@@ -733,7 +733,7 @@ MCSectionCOFF *MCContext::getCOFFSection(StringRef Section,
 MCSectionCOFF *MCContext::getCOFFSection(StringRef Section,
                                          unsigned Characteristics,
                                          SectionKind Kind,
-                                         const char *BeginSymName) {
+                                         StringRef BeginSymName) {
   return getCOFFSection(Section, Characteristics, Kind, "", 0, GenericSectionID,
                         BeginSymName);
 }
@@ -814,7 +814,7 @@ bool MCContext::hasXCOFFSection(StringRef Section,
 MCSectionXCOFF *MCContext::getXCOFFSection(
     StringRef Section, SectionKind Kind,
     std::optional<XCOFF::CsectProperties> CsectProp, bool MultiSymbolsAllowed,
-    const char *BeginSymName,
+    StringRef BeginSymName,
     std::optional<XCOFF::DwarfSectionSubtypeFlags> DwarfSectionSubtypeFlags) {
   bool IsDwarfSec = DwarfSectionSubtypeFlags.has_value();
   assert((IsDwarfSec != CsectProp.has_value()) && "Invalid XCOFF section!");
@@ -845,7 +845,7 @@ MCSectionXCOFF *MCContext::getXCOFFSection(
         XCOFF::getMappingClassString(CsectProp->MappingClass) + "]"));
 
   MCSymbol *Begin = nullptr;
-  if (BeginSymName)
+  if (!BeginSymName.empty())
     Begin = createTempSymbol(BeginSymName, false);
 
   // QualName->getUnqualifiedName() and CachedName are the same except when

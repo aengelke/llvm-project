@@ -32,7 +32,7 @@ class Value;
 // kinds of loops we can deal with -- ones that have a single latch that is also
 // an exiting block *and* have a canonical induction variable.
 struct LoopStructure {
-  const char *Tag = "";
+  StringRef Tag = "";
 
   BasicBlock *Header = nullptr;
   BasicBlock *Latch = nullptr;
@@ -134,7 +134,7 @@ private:
   // running `cloneLoop' is well formed except for the PHI nodes in CLResult --
   // the PHI nodes say that there is an incoming edge from `OriginalPreheader`
   // but there is no such edge.
-  void cloneLoop(ClonedLoop &CLResult, const char *Tag) const;
+  void cloneLoop(ClonedLoop &CLResult, StringRef Tag) const;
 
   // Create the appropriate loop structure needed to describe a cloned copy of
   // `Original`.  The clone is described by `VM`.
@@ -170,7 +170,7 @@ private:
   // The loop denoted by `LS' has `OldPreheader' as its preheader.  This
   // function creates a new preheader for `LS' and returns it.
   BasicBlock *createPreheader(const LoopStructure &LS, BasicBlock *OldPreheader,
-                              const char *Tag) const;
+                              StringRef Tag) const;
 
   // `ContinuationBlockAndPreheader' was the continuation block for some call to
   // `changeIterationSpaceEnd' and is the preheader to the loop denoted by `LS'.

@@ -252,10 +252,10 @@ std::string getMainExecutable(const char *argv0, void *MainAddr) {
     return exe_path;
 #elif defined(__linux__) || defined(__CYGWIN__) || defined(__gnu_hurd__)
   char exe_path[PATH_MAX];
-  const char *aPath = "/proc/self/exe";
+  constexpr StringLiteral aPath = "/proc/self/exe";
   if (sys::fs::exists(aPath)) {
     // /proc is not always mounted under Linux (chroot for example).
-    ssize_t len = readlink(aPath, exe_path, sizeof(exe_path));
+    ssize_t len = readlink(aPath.begin(), exe_path, sizeof(exe_path));
     if (len < 0)
       return "";
 
@@ -369,13 +369,13 @@ ErrorOr<space_info> disk_space(const Twine &Path) {
 std::error_code current_path(SmallVectorImpl<char> &result) {
   result.clear();
 
-  const char *pwd = ::getenv("PWD");
+  StringRef pwd = ::getenv("PWD");
   llvm::sys::fs::file_status PWDStatus, DotStatus;
-  if (pwd && llvm::sys::path::is_absolute(pwd) &&
+  if (llvm::sys::path::is_absolute(pwd) &&
       !llvm::sys::fs::status(pwd, PWDStatus) &&
       !llvm::sys::fs::status(".", DotStatus) &&
       PWDStatus.getUniqueID() == DotStatus.getUniqueID()) {
-    result.append(pwd, pwd + strlen(pwd));
+    result.append(pwd.begin(), pwd.end());
     return std::error_code();
   }
 

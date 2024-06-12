@@ -101,7 +101,7 @@ performBlockTailMerging(Function &F, ArrayRef<BasicBlock *> BBs,
     // Create a canonical block for this function terminator type now,
     // placing it *before* the first block that will branch to it.
     CanonicalBB = BasicBlock::Create(
-        F.getContext(), Twine("common.") + Term->getOpcodeName(), &F, BBs[0]);
+        F.getContext(), "common." + StringRef(Term->getOpcodeName()), &F, BBs[0]);
     // We'll also need a PHI node per each operand of the terminator.
     NewOps.resize(Term->getNumOperands());
     for (auto I : zip(Term->operands(), NewOps)) {

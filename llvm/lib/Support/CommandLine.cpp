@@ -1251,7 +1251,7 @@ Error ExpansionContext::expandResponseFiles(
       continue;
     }
 
-    const char *FName = Arg + 1;
+    StringRef FName = Arg + 1;
     // Note that CurrentDir is only used for top-level rsp files, the rest will
     // always have an absolute path deduced from the containing file.
     SmallString<128> CurrDir;
@@ -1267,7 +1267,7 @@ Error ExpansionContext::expandResponseFiles(
         CurrDir = CurrentDir;
       }
       llvm::sys::path::append(CurrDir, FName);
-      FName = CurrDir.c_str();
+      FName = CurrDir;
     }
 
     ErrorOr<llvm::vfs::Status> Res = FS->status(FName);
@@ -1320,7 +1320,7 @@ Error ExpansionContext::expandResponseFiles(
       Record.End += ExpandedArgv.size() - 1;
     }
 
-    FileStack.push_back({FName, I + ExpandedArgv.size()});
+    FileStack.push_back({FName.str(), I + ExpandedArgv.size()});
     Argv.erase(Argv.begin() + I);
     Argv.insert(Argv.begin() + I, ExpandedArgv.begin(), ExpandedArgv.end());
   }

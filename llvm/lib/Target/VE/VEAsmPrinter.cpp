@@ -239,7 +239,7 @@ void VEAsmPrinter::lowerGETFunPLTAndEmitMCInsts(const MachineInstr *MI,
     report_fatal_error("ConstantPool is not supported yet");
     return;
   case MachineOperand::MO_ExternalSymbol:
-    AddrSym = GetExternalSymbolSymbol(Addr.getSymbolName());
+    AddrSym = GetExternalSymbolSymbol(StringRef(Addr.getSymbolName()));
     break;
   case MachineOperand::MO_GlobalAddress:
     AddrSym = getSymbol(Addr.getGlobal());
@@ -285,7 +285,7 @@ void VEAsmPrinter::lowerGETTLSAddrAndEmitMCInsts(const MachineInstr *MI,
     report_fatal_error("ConstantPool is not supported yet");
     return;
   case MachineOperand::MO_ExternalSymbol:
-    AddrSym = GetExternalSymbolSymbol(Addr.getSymbolName());
+    AddrSym = GetExternalSymbolSymbol(StringRef(Addr.getSymbolName()));
     break;
   case MachineOperand::MO_GlobalAddress:
     AddrSym = getSymbol(Addr.getGlobal());

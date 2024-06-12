@@ -160,7 +160,7 @@ MachOUniversalBinary::MachOUniversalBinary(MemoryBufferRef Source, Error &Err)
   }
   if (Buf.size() < MinSize) {
     Err = malformedError("fat_arch" +
-                         Twine(Magic == MachO::FAT_MAGIC ? "" : "_64") +
+                         (Magic == MachO::FAT_MAGIC ? Twine("") : Twine("_64")) +
                          " structs would extend past the end of the file");
     return;
   }

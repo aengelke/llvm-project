@@ -404,7 +404,7 @@ Expected<int64_t> readAddendData(LinkGraph &G, Block &B, Edge::OffsetT Offset,
     return make_error<JITLinkError>(
         "In graph " + G.getName() + ", section " + B.getSection().getName() +
         " can not read implicit addend for aarch32 edge kind " +
-        G.getEdgeKindName(Kind));
+        StringRef(G.getEdgeKindName(Kind)));
   }
 }
 
@@ -427,7 +427,7 @@ Expected<int64_t> readAddendArm(LinkGraph &G, Block &B, Edge::OffsetT Offset,
     return make_error<JITLinkError>(
         "In graph " + G.getName() + ", section " + B.getSection().getName() +
         " can not read implicit addend for aarch32 edge kind " +
-        G.getEdgeKindName(Kind));
+        StringRef(G.getEdgeKindName(Kind)));
   }
 }
 
@@ -458,7 +458,7 @@ Expected<int64_t> readAddendThumb(LinkGraph &G, Block &B, Edge::OffsetT Offset,
     return make_error<JITLinkError>(
         "In graph " + G.getName() + ", section " + B.getSection().getName() +
         " can not read implicit addend for aarch32 edge kind " +
-        G.getEdgeKindName(Kind));
+        StringRef(G.getEdgeKindName(Kind)));
   }
 }
 
@@ -516,7 +516,7 @@ Error applyFixupData(LinkGraph &G, Block &B, const Edge &E) {
     return make_error<JITLinkError>(
         "In graph " + G.getName() + ", section " + B.getSection().getName() +
         " encountered unfixable aarch32 edge kind " +
-        G.getEdgeKindName(E.getKind()));
+        StringRef(G.getEdgeKindName(E.getKind())));
   }
 }
 
@@ -590,7 +590,7 @@ Error applyFixupArm(LinkGraph &G, Block &B, const Edge &E) {
     return make_error<JITLinkError>(
         "In graph " + G.getName() + ", section " + B.getSection().getName() +
         " encountered unfixable aarch32 edge kind " +
-        G.getEdgeKindName(E.getKind()));
+        StringRef(G.getEdgeKindName(E.getKind())));
   }
 }
 
@@ -689,7 +689,7 @@ Error applyFixupThumb(LinkGraph &G, Block &B, const Edge &E,
     return make_error<JITLinkError>(
         "In graph " + G.getName() + ", section " + B.getSection().getName() +
         " encountered unfixable aarch32 edge kind " +
-        G.getEdgeKindName(E.getKind()));
+        StringRef(G.getEdgeKindName(E.getKind())));
   }
 }
 

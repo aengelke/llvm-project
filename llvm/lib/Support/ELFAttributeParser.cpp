@@ -26,7 +26,7 @@ Error ELFAttributeParser::parseStringAttribute(const char *name, unsigned tag,
   if (value >= strings.size()) {
     printAttribute(tag, value, "");
     return createStringError(errc::invalid_argument,
-                             "unknown " + Twine(name) +
+                             "unknown " + Twine(StringRef(name)) +
                                  " value: " + Twine(value));
   }
   printAttribute(tag, value, strings[value]);

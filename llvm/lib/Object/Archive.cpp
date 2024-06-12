@@ -1293,7 +1293,7 @@ static Error getGlobalSymtabLocAndSize(const MemoryBufferRef &Data,
       GlobalSymtabOffset + sizeof(BigArMemHdrType);
   if (GlobalSymtabContentOffset > BufferSize)
     return malformedError(
-        Twine(BitMessage) + " global symbol table header at offset 0x" +
+        StringRef(BitMessage) + " global symbol table header at offset 0x" +
         Twine::utohexstr(GlobalSymtabOffset) + " and size 0x" +
         Twine::utohexstr(sizeof(BigArMemHdrType)) +
         " goes past the end of file");
@@ -1303,12 +1303,12 @@ static Error getGlobalSymtabLocAndSize(const MemoryBufferRef &Data,
       reinterpret_cast<const BigArMemHdrType *>(GlobalSymtabLoc);
   StringRef RawOffset = getFieldRawString(GlobalSymHdr->Size);
   if (RawOffset.getAsInteger(10, Size))
-    return malformedError(Twine(BitMessage) + " global symbol table size \"" +
+    return malformedError(StringRef(BitMessage) + " global symbol table size \"" +
                           RawOffset + "\" is not a number");
 
   if (GlobalSymtabContentOffset + Size > BufferSize)
     return malformedError(
-        Twine(BitMessage) + " global symbol table content at offset 0x" +
+        StringRef(BitMessage) + " global symbol table content at offset 0x" +
         Twine::utohexstr(GlobalSymtabContentOffset) + " and size 0x" +
         Twine::utohexstr(Size) + " goes past the end of file");
 

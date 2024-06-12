@@ -852,7 +852,7 @@ static Expected<int> connectTCPSocket(std::string Host, std::string PortStr) {
   // If we reached the end of the loop without connecting to a valid endpoint,
   // dump the last error that was logged in socket() or connect().
   if (Server == nullptr)
-    return createTCPSocketError(std::strerror(errno));
+    return createTCPSocketError(StringRef(std::strerror(errno)));
 
   return SockFD;
 }
@@ -2006,7 +2006,7 @@ static Error addLibraries(Session &S,
         LibPath.push_back('\0');
 
         // Skip missing or non-regular paths.
-        if (sys::fs::get_file_type(LibPath.data()) !=
+        if (sys::fs::get_file_type(LibPath) !=
             sys::fs::file_type::regular_file) {
           continue;
         }

@@ -189,5 +189,5 @@ LLVMErrorTypeId LLVMGetStringErrorTypeId() {
 }
 
 LLVMErrorRef LLVMCreateStringError(const char *ErrMsg) {
-  return wrap(make_error<StringError>(ErrMsg, inconvertibleErrorCode()));
+  return wrap(make_error<StringError>(StringRef(ErrMsg), inconvertibleErrorCode()));
 }

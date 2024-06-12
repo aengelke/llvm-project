@@ -256,7 +256,7 @@ Error DWARFLinkerImpl::validateAndUpdateOptions() {
 /// Resolve the relative path to a build artifact referenced by DWARF by
 /// applying DW_AT_comp_dir.
 static void resolveRelativeObjectPath(SmallVectorImpl<char> &Buf, DWARFDie CU) {
-  sys::path::append(Buf, dwarf::toString(CU.find(dwarf::DW_AT_comp_dir), ""));
+  sys::path::append(Buf, StringRef(dwarf::toString(CU.find(dwarf::DW_AT_comp_dir), "")));
 }
 
 static uint64_t getDwoId(const DWARFDie &CUDie) {

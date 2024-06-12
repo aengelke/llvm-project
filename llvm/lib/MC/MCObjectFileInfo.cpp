@@ -1115,10 +1115,10 @@ MCSection *MCObjectFileInfo::getDwarfComdatSection(const char *Name,
                                                    uint64_t Hash) const {
   switch (Ctx->getTargetTriple().getObjectFormat()) {
   case Triple::ELF:
-    return Ctx->getELFSection(Name, ELF::SHT_PROGBITS, ELF::SHF_GROUP, 0,
+    return Ctx->getELFSection(StringRef(Name), ELF::SHT_PROGBITS, ELF::SHF_GROUP, 0,
                               utostr(Hash), /*IsComdat=*/true);
   case Triple::Wasm:
-    return Ctx->getWasmSection(Name, SectionKind::getMetadata(), 0,
+    return Ctx->getWasmSection(StringRef(Name), SectionKind::getMetadata(), 0,
                                utostr(Hash), MCContext::GenericSectionID);
   case Triple::MachO:
   case Triple::COFF:

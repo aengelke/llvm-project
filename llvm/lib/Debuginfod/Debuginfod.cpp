@@ -226,7 +226,7 @@ static SmallVector<std::string, 0> getHeaders() {
   if (!Filename)
     return {};
   ErrorOr<std::unique_ptr<MemoryBuffer>> HeadersFile =
-      MemoryBuffer::getFile(Filename, /*IsText=*/true);
+      MemoryBuffer::getFile(StringRef(Filename), /*IsText=*/true);
   if (!HeadersFile)
     return {};
 

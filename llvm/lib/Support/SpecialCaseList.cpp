@@ -29,7 +29,7 @@ Error SpecialCaseList::Matcher::insert(StringRef Pattern, unsigned LineNumber,
   if (Pattern.empty())
     return createStringError(errc::invalid_argument,
                              Twine("Supplied ") +
-                                 (UseGlobs ? "glob" : "regex") + " was blank");
+                                 (UseGlobs ? Twine("glob") : Twine("regex")) + " was blank");
 
   if (!UseGlobs) {
     // Replace * with .*
@@ -193,7 +193,7 @@ bool SpecialCaseList::parse(const MemoryBuffer *MB, std::string &Error) {
     auto &Entry = CurrentSection->Entries[Prefix][Category];
     if (auto Err = Entry.insert(Pattern, LineNo, UseGlobs)) {
       Error =
-          (Twine("malformed ") + (UseGlobs ? "glob" : "regex") + " in line " +
+          (Twine("malformed ") + (UseGlobs ? Twine("glob") : Twine("regex")) + " in line " +
            Twine(LineNo) + ": '" + Pattern + "': " + toString(std::move(Err)))
               .str();
       return false;

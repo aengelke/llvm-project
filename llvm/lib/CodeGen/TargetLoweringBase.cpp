@@ -2021,7 +2021,7 @@ TargetLoweringBase::getDefaultSafeStackPointerLocation(IRBuilderBase &IRB,
   // compiler-rt provides a variable with a magic name.  Targets that do not
   // link with compiler-rt may also provide such a variable.
   Module *M = IRB.GetInsertBlock()->getParent()->getParent();
-  const char *UnsafeStackPtrVar = "__safestack_unsafe_stack_ptr";
+  StringRef UnsafeStackPtrVar = "__safestack_unsafe_stack_ptr";
   auto UnsafeStackPtr =
       dyn_cast_or_null<GlobalVariable>(M->getNamedValue(UnsafeStackPtrVar));
 
@@ -2043,7 +2043,7 @@ TargetLoweringBase::getDefaultSafeStackPointerLocation(IRBuilderBase &IRB,
       report_fatal_error(Twine(UnsafeStackPtrVar) + " must have void* type");
     if (UseTLS != UnsafeStackPtr->isThreadLocal())
       report_fatal_error(Twine(UnsafeStackPtrVar) + " must " +
-                         (UseTLS ? "" : "not ") + "be thread-local");
+                         StringRef(UseTLS ? "" : "not ") + "be thread-local");
   }
   return UnsafeStackPtr;
 }

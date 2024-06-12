@@ -168,7 +168,7 @@ enum class CloneFunctionChangeType {
 void CloneFunctionInto(Function *NewFunc, const Function *OldFunc,
                        ValueToValueMapTy &VMap, CloneFunctionChangeType Changes,
                        SmallVectorImpl<ReturnInst *> &Returns,
-                       const char *NameSuffix = "",
+                       StringRef NameSuffix = "",
                        ClonedCodeInfo *CodeInfo = nullptr,
                        ValueMapTypeRemapper *TypeMapper = nullptr,
                        ValueMaterializer *Materializer = nullptr);
@@ -177,7 +177,7 @@ void CloneAndPruneIntoFromInst(Function *NewFunc, const Function *OldFunc,
                                const Instruction *StartingInst,
                                ValueToValueMapTy &VMap, bool ModuleLevelChanges,
                                SmallVectorImpl<ReturnInst *> &Returns,
-                               const char *NameSuffix = "",
+                               StringRef NameSuffix = "",
                                ClonedCodeInfo *CodeInfo = nullptr);
 
 /// This works exactly like CloneFunctionInto,

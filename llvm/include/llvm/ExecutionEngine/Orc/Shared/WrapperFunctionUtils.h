@@ -455,12 +455,12 @@ public:
         detail::serializeViaSPSToWrapperFunctionResult<SPSArgList<SPSTagTs...>>(
             Args...);
     if (const char *ErrMsg = ArgBuffer.getOutOfBandError())
-      return make_error<StringError>(ErrMsg, inconvertibleErrorCode());
+      return make_error<StringError>(StringRef(ErrMsg), inconvertibleErrorCode());
 
     WrapperFunctionResult ResultBuffer =
         Caller(ArgBuffer.data(), ArgBuffer.size());
     if (auto ErrMsg = ResultBuffer.getOutOfBandError())
-      return make_error<StringError>(ErrMsg, inconvertibleErrorCode());
+      return make_error<StringError>(StringRef(ErrMsg), inconvertibleErrorCode());
 
     return detail::ResultDeserializer<SPSRetTagT, RetT>::deserialize(
         Result, ResultBuffer.data(), ResultBuffer.size());
@@ -485,7 +485,7 @@ public:
             Args...);
     if (auto *ErrMsg = ArgBuffer.getOutOfBandError()) {
       SendDeserializedResult(
-          make_error<StringError>(ErrMsg, inconvertibleErrorCode()),
+          make_error<StringError>(StringRef(ErrMsg), inconvertibleErrorCode()),
           detail::ResultDeserializer<SPSRetTagT, RetT>::makeValue());
       return;
     }
@@ -496,7 +496,7 @@ public:
       detail::ResultDeserializer<SPSRetTagT, RetT>::makeSafe(RetVal);
 
       if (auto *ErrMsg = R.getOutOfBandError()) {
-        SDR(make_error<StringError>(ErrMsg, inconvertibleErrorCode()),
+        SDR(make_error<StringError>(StringRef(ErrMsg), inconvertibleErrorCode()),
             std::move(RetVal));
         return;
       }
@@ -674,7 +674,7 @@ public:
   runWithSPSRet(RetT &RetVal) const {
     auto WFR = run();
     if (const char *ErrMsg = WFR.getOutOfBandError())
-      return make_error<StringError>(ErrMsg, inconvertibleErrorCode());
+      return make_error<StringError>(StringRef(ErrMsg), inconvertibleErrorCode());
     shared::SPSInputBuffer IB(WFR.data(), WFR.size());
     if (!shared::SPSSerializationTraits<SPSRetT, RetT>::deserialize(IB, RetVal))
       return make_error<StringError>("Could not deserialize result from "

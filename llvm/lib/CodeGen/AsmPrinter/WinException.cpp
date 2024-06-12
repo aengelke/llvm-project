@@ -654,8 +654,8 @@ void WinException::emitSEHActionsForRange(const WinEHFuncInfo &FuncInfo,
     OS.emitValue(getLabel(BeginLabel), 4);
     AddComment("LabelEnd");
     OS.emitValue(getLabelPlusOne(EndLabel), 4);
-    AddComment(UME.IsFinally ? "FinallyFunclet" : UME.Filter ? "FilterFunction"
-                                                             : "CatchAll");
+    AddComment(UME.IsFinally ? StringRef("FinallyFunclet") : UME.Filter ? StringRef("FilterFunction")
+                                                             : StringRef("CatchAll"));
     OS.emitValue(FilterOrFinally, 4);
     AddComment(UME.IsFinally ? "Null" : "ExceptionHandler");
     OS.emitValue(ExceptOrNull, 4);
@@ -996,7 +996,7 @@ void WinException::emitExceptHandlerTable(const MachineFunction *MF) {
   StringRef FLinkageName = GlobalValue::dropLLVMManglingEscape(F.getName());
 
   bool VerboseAsm = OS.isVerboseAsm();
-  auto AddComment = [&](const Twine &Comment) {
+  auto AddComment = [&](StringRef Comment) {
     if (VerboseAsm)
       OS.AddComment(Comment);
   };

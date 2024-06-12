@@ -62,7 +62,7 @@ GlobalVariable *llvm::createPrivateGlobalForString(Module &M, StringRef Str,
   // with another one, we set the unnamed_addr attribute.
   GlobalVariable *GV =
       new GlobalVariable(M, StrConst->getType(), true,
-                         GlobalValue::PrivateLinkage, StrConst, NamePrefix);
+                         GlobalValue::PrivateLinkage, StrConst, StringRef(NamePrefix));
   if (AllowMerging)
     GV->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
   GV->setAlignment(Align(1)); // Strings may not be merged w/o setting

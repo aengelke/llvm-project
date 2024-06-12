@@ -31,7 +31,7 @@ void WasmException::endModule() {
   // the importing modules. So we make them undefined symbols here, define tags
   // in the JS side, and feed them to each importing module.
   if (!Asm->isPositionIndependent()) {
-    for (const char *SymName : {"__cpp_exception", "__c_longjmp"}) {
+    for (StringRef SymName : {"__cpp_exception", "__c_longjmp"}) {
       SmallString<60> NameStr;
       Mangler::getNameWithPrefix(NameStr, SymName, Asm->getDataLayout());
       if (Asm->OutContext.lookupSymbol(NameStr)) {

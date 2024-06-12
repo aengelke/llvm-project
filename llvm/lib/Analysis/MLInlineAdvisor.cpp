@@ -40,7 +40,7 @@ static cl::opt<std::string> InteractiveChannelBaseName(
         "outgoing name should be <inliner-interactive-channel-base>.out"));
 static const std::string InclDefaultMsg =
     (Twine("In interactive mode, also send the default policy decision: ") +
-     DefaultDecisionName + ".")
+     StringRef(DefaultDecisionName) + ".")
         .str();
 static cl::opt<bool>
     InteractiveIncludeDefault("inliner-interactive-include-default", cl::Hidden,

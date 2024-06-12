@@ -4185,7 +4185,7 @@ void CodeGenDAGPatterns::VerifyInstructionFlags() {
       PrintError(
           PTM.getSrcRecord()->getLoc(),
           Twine(Msg) + " on the " +
-              (Instrs.size() == 1 ? "instruction" : "output instructions"));
+              (Instrs.size() == 1 ? Twine("instruction") :Twine( "output instructions")));
     // Provide the location of the relevant instruction definitions.
     for (const Record *Instr : Instrs) {
       if (Instr != PTM.getSrcRecord())

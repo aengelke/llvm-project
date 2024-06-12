@@ -169,7 +169,7 @@ unsigned SampleCoverageTracker::computeCoverage(unsigned Used,
 
 /// Create a global variable to flag FSDiscriminators are used.
 void createFSDiscriminatorVariable(Module *M) {
-  const char *FSDiscriminatorVar = "__llvm_fs_discriminator__";
+  StringRef FSDiscriminatorVar = "__llvm_fs_discriminator__";
   if (M->getGlobalVariable(FSDiscriminatorVar))
     return;
 

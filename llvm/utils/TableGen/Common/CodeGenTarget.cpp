@@ -290,7 +290,7 @@ static const CodeGenInstruction *GetInstByName(
 
   const auto I = Insts.find(Rec);
   if (!Rec || I == Insts.end())
-    PrintFatalError(Twine("Could not find '") + Name + "' instruction!");
+    PrintFatalError(Twine("Could not find '") + StringRef(Name) + "' instruction!");
   return I->second.get();
 }
 

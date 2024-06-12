@@ -1988,7 +1988,7 @@ const MCExpr *VETargetLowering::LowerCustomJumpTableEntry(
   // Generate custom label for PIC like below.
   //    .4bytes  .LBB0_2-<function name>
   const auto *Value = MCSymbolRefExpr::create(MBB->getSymbol(), Ctx);
-  MCSymbol *Sym = Ctx.getOrCreateSymbol(MBB->getParent()->getName().data());
+  MCSymbol *Sym = Ctx.getOrCreateSymbol(MBB->getParent()->getName());
   const auto *Base = MCSymbolRefExpr::create(Sym, Ctx);
   return MCBinaryExpr::createSub(Value, Base, Ctx);
 }

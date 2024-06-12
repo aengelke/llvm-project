@@ -62,7 +62,7 @@ unsigned ARMWinCOFFObjectWriter::getRelocType(MCContext &Ctx,
   switch (FixupKind) {
   default: {
     const MCFixupKindInfo &Info = MAB.getFixupKindInfo(Fixup.getKind());
-    report_fatal_error(Twine("unsupported relocation type: ") + Info.Name);
+    report_fatal_error(Twine("unsupported relocation type: ") + StringRef(Info.Name));
   }
   case FK_Data_4:
     switch (Modifier) {

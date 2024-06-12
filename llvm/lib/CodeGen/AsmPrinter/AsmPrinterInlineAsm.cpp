@@ -186,7 +186,7 @@ static void EmitInlineAsmStr(const char *AsmStr, const MachineInstr *MI,
         ++LastEmitted; // Consume '(' character.
         if (CurVariant != -1)
           report_fatal_error("Nested variants found in inline asm string: '" +
-                             Twine(AsmStr) + "'");
+                            StringRef(AsmStr) + "'");
         CurVariant = 0; // We're in the first variant now.
         break;
       case '|':
@@ -221,7 +221,7 @@ static void EmitInlineAsmStr(const char *AsmStr, const MachineInstr *MI,
         const char *StrEnd = strchr(StrStart, '}');
         if (!StrEnd)
           report_fatal_error("Unterminated ${:foo} operand in inline asm"
-                             " string: '" + Twine(AsmStr) + "'");
+                             " string: '" + StringRef(AsmStr) + "'");
         if (CurVariant == -1 || CurVariant == AsmPrinterVariant)
           AP->PrintSpecial(MI, OS, StringRef(StrStart, StrEnd - StrStart));
         LastEmitted = StrEnd+1;
@@ -236,12 +236,12 @@ static void EmitInlineAsmStr(const char *AsmStr, const MachineInstr *MI,
       unsigned Val;
       if (StringRef(IDStart, IDEnd-IDStart).getAsInteger(10, Val))
         report_fatal_error("Bad $ operand number in inline asm string: '" +
-                           Twine(AsmStr) + "'");
+                           StringRef(AsmStr) + "'");
       LastEmitted = IDEnd;
 
       if (Val >= NumOperands - 1)
         report_fatal_error("Invalid $ operand number in inline asm string: '" +
-                           Twine(AsmStr) + "'");
+                           StringRef(AsmStr) + "'");
 
       char Modifier[2] = { 0, 0 };
 
@@ -252,7 +252,7 @@ static void EmitInlineAsmStr(const char *AsmStr, const MachineInstr *MI,
           ++LastEmitted;    // Consume ':' character.
           if (*LastEmitted == 0)
             report_fatal_error("Bad ${:} expression in inline asm string: '" +
-                               Twine(AsmStr) + "'");
+                               StringRef(AsmStr) + "'");
 
           Modifier[0] = *LastEmitted;
           ++LastEmitted;    // Consume modifier character.
@@ -260,7 +260,7 @@ static void EmitInlineAsmStr(const char *AsmStr, const MachineInstr *MI,
 
         if (*LastEmitted != '}')
           report_fatal_error("Bad ${} expression in inline asm string: '" +
-                             Twine(AsmStr) + "'");
+                             StringRef(AsmStr) + "'");
         ++LastEmitted;    // Consume '}' character.
       }
 
@@ -334,14 +334,14 @@ void AsmPrinter::emitInlineAsm(const MachineInstr *MI) const {
   // If this asmstr is empty, just print the #APP/#NOAPP markers.
   // These are useful to see where empty asm's wound up.
   if (AsmStr[0] == 0) {
-    OutStreamer->emitRawComment(MAI->getInlineAsmStart());
-    OutStreamer->emitRawComment(MAI->getInlineAsmEnd());
+    OutStreamer->emitRawComment(StringRef(MAI->getInlineAsmStart()));
+    OutStreamer->emitRawComment(StringRef(MAI->getInlineAsmEnd()));
     return;
   }
 
   // Emit the #APP start marker.  This has to happen even if verbose-asm isn't
   // enabled, so we use emitRawComment.
-  OutStreamer->emitRawComment(MAI->getInlineAsmStart());
+  OutStreamer->emitRawComment(StringRef(MAI->getInlineAsmStart()));
 
   // Get the !srcloc metadata node if we have it, and decode the loc cookie from
   // it.
@@ -393,7 +393,7 @@ void AsmPrinter::emitInlineAsm(const MachineInstr *MI) const {
       Msg += LS;
       Msg += TRI->getRegAsmName(RR);
     }
-    const char *Note =
+    StringRef Note =
         "Reserved registers on the clobber list may not be "
         "preserved across the asm statement, and clobbering them may "
         "lead to undefined behaviour.";
@@ -416,7 +416,7 @@ void AsmPrinter::emitInlineAsm(const MachineInstr *MI) const {
 
   // Emit the #NOAPP end marker.  This has to happen even if verbose-asm isn't
   // enabled, so we use emitRawComment.
-  OutStreamer->emitRawComment(MAI->getInlineAsmEnd());
+  OutStreamer->emitRawComment(StringRef(MAI->getInlineAsmEnd()));
 }
 
 /// PrintSpecial - Print information related to the specified machine instr

@@ -1842,7 +1842,7 @@ Comdat *LLParser::getComdat(const std::string &Name, LocTy Loc) {
 /// success.  Otherwise, emit the specified error and return failure.
 bool LLParser::parseToken(lltok::Kind T, const char *ErrMsg) {
   if (Lex.getKind() != T)
-    return tokError(ErrMsg);
+    return tokError(StringRef(ErrMsg));
   Lex.Lex();
   return false;
 }
@@ -2370,7 +2370,7 @@ bool LLParser::parseOptionalAlignment(MaybeAlign &Alignment, bool AllowParens) {
 bool LLParser::parseOptionalCodeModel(CodeModel::Model &model) {
   Lex.Lex();
   auto StrVal = Lex.getStrVal();
-  auto ErrMsg = "expected global code model string";
+  StringRef ErrMsg = "expected global code model string";
   if (StrVal == "tiny")
     model = CodeModel::Tiny;
   else if (StrVal == "small")
@@ -3006,7 +3006,7 @@ bool LLParser::parseParameterList(SmallVectorImpl<ParamInfo> &ArgList,
 
     // parse an ellipsis if this is a musttail call in a variadic function.
     if (Lex.getKind() == lltok::dotdotdot) {
-      const char *Msg = "unexpected ellipsis in argument list for ";
+      StringRef Msg = "unexpected ellipsis in argument list for ";
       if (!IsMustTailCall)
         return tokError(Twine(Msg) + "non-musttail call");
       if (!InVarArgsFunc)
@@ -7720,7 +7720,7 @@ bool LLParser::parseSelect(Instruction *&Inst, PerFunctionState &PFS) {
     return true;
 
   if (const char *Reason = SelectInst::areInvalidOperands(Op0, Op1, Op2))
-    return error(Loc, Reason);
+    return error(Loc, StringRef(Reason));
 
   Inst = SelectInst::Create(Op0, Op1, Op2);
   return false;

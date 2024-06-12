@@ -67,7 +67,7 @@ SimpleExecutorDylibManager::lookup(tpctypes::DylibHandle H,
       void *Addr = DL.getAddressOfSymbol(DemangledSymName);
       if (!Addr && E.Required)
         return make_error<StringError>(Twine("Missing definition for ") +
-                                           DemangledSymName,
+                                           E.Name.substr(1),
                                        inconvertibleErrorCode());
 
       // FIXME: determine accurate JITSymbolFlags.

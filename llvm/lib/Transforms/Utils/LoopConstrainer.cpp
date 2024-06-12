@@ -466,7 +466,7 @@ LoopConstrainer::LoopConstrainer(Loop &L, LoopInfo &LI,
       MainLoopStructure(LS), SR(SR) {}
 
 void LoopConstrainer::cloneLoop(LoopConstrainer::ClonedLoop &Result,
-                                const char *Tag) const {
+                                StringRef Tag) const {
   for (BasicBlock *BB : OriginalLoop.getBlocks()) {
     BasicBlock *Clone = CloneBasicBlock(BB, Result.Map, Twine(".") + Tag, &F);
     Result.Blocks.push_back(Clone);
@@ -683,7 +683,7 @@ void LoopConstrainer::rewriteIncomingValuesForPHIs(
 
 BasicBlock *LoopConstrainer::createPreheader(const LoopStructure &LS,
                                              BasicBlock *OldPreheader,
-                                             const char *Tag) const {
+                                             StringRef Tag) const {
   BasicBlock *Preheader = BasicBlock::Create(Ctx, Tag, &F, LS.Header);
   BranchInst::Create(LS.Header, Preheader);
 

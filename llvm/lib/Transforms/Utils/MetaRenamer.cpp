@@ -65,7 +65,7 @@ static cl::opt<bool>
                    cl::desc("only rename the instructions in the function"),
                    cl::Hidden);
 
-static const char *const metaNames[] = {
+static constexpr StringLiteral metaNames[] = {
   // See http://en.wikipedia.org/wiki/Metasyntactic_variable
   "foo", "bar", "baz", "quux", "barney", "snork", "zot", "blam", "hoge",
   "wibble", "wobble", "widget", "wombat", "ham", "eggs", "pluto", "spam"
@@ -89,7 +89,7 @@ struct PRNG {
 struct Renamer {
   Renamer(unsigned int seed) { prng.srand(seed); }
 
-  const char *newName() {
+  StringRef newName() {
     return metaNames[prng.rand() % std::size(metaNames)];
   }
 
@@ -111,7 +111,7 @@ parseExcludedPrefixes(StringRef PrefixesStr,
 void MetaRenameOnlyInstructions(Function &F) {
   for (auto &I : instructions(F))
     if (!I.getType()->isVoidTy() && I.getName().empty())
-      I.setName(I.getOpcodeName());
+      I.setName(StringRef(I.getOpcodeName()));
 }
 
 void MetaRename(Function &F) {
@@ -124,7 +124,7 @@ void MetaRename(Function &F) {
 
     for (auto &I : BB)
       if (!I.getType()->isVoidTy())
-        I.setName(I.getOpcodeName());
+        I.setName(StringRef(I.getOpcodeName()));
   }
 }
 
@@ -205,7 +205,7 @@ void MetaRename(Module &M,
 
     SmallString<128> NameStorage;
     STy->setName(
-        (Twine("struct.") + renamer.newName()).toStringRef(NameStorage));
+        (Twine("struct.") + StringRef(renamer.newName())).toStringRef(NameStorage));
   }
 
   // Rename all functions

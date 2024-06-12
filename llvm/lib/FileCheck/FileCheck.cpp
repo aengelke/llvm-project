@@ -456,7 +456,7 @@ Expected<std::unique_ptr<ExpressionAST>> Pattern::parseNumericOperand(
   return ErrorDiagnostic::get(
       SM, SaveExpr,
       Twine("invalid ") +
-          (MaybeInvalidConstraint ? "matching constraint or " : "") +
+          (MaybeInvalidConstraint ? Twine("matching constraint or ") : Twine("")) +
           "operand format");
 }
 
@@ -2251,7 +2251,7 @@ bool FileCheckString::CheckNext(const SourceMgr &SM, StringRef Buffer) const {
 
   Twine CheckName =
       Prefix +
-      Twine(Pat.getCheckTy() == Check::CheckEmpty ? "-EMPTY" : "-NEXT");
+      (Pat.getCheckTy() == Check::CheckEmpty ? Twine("-EMPTY") : Twine("-NEXT"));
 
   // Count the number of newlines between the previous match and this one.
   const char *FirstNewLine = nullptr;

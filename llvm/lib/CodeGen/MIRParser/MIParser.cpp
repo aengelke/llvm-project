@@ -613,7 +613,7 @@ SMLoc MIParser::mapSMLoc(StringRef::iterator Loc) {
 typedef function_ref<bool(StringRef::iterator Loc, const Twine &)>
     ErrorCallbackType;
 
-static const char *toString(MIToken::TokenKind TokenKind) {
+static StringRef toString(MIToken::TokenKind TokenKind) {
   switch (TokenKind) {
   case MIToken::comma:
     return "','";
@@ -1406,7 +1406,7 @@ bool MIParser::parseMetadata(Metadata *&MD) {
   return false;
 }
 
-static const char *printImplicitRegisterFlag(const MachineOperand &MO) {
+static StringRef printImplicitRegisterFlag(const MachineOperand &MO) {
   assert(MO.isImplicit());
   return MO.isDef() ? "implicit-def" : "implicit";
 }
@@ -1587,7 +1587,7 @@ bool MIParser::parseRegisterClassOrBank(VRegInfo &RegInfo) {
       if (RegInfo.Explicit && RegInfo.D.RC != RC) {
         const TargetRegisterInfo &TRI = *MF.getSubtarget().getRegisterInfo();
         return error(Loc, Twine("conflicting register classes, previously: ") +
-                     Twine(TRI.getRegClassName(RegInfo.D.RC)));
+                     StringRef(TRI.getRegClassName(RegInfo.D.RC)));
       }
       RegInfo.D.RC = RC;
       RegInfo.Explicit = true;
@@ -3426,7 +3426,7 @@ bool MIParser::parseMachineMemoryOperand(MachineMemOperand *&Dest) {
 
   MachinePointerInfo Ptr = MachinePointerInfo();
   if (Token.is(MIToken::Identifier)) {
-    const char *Word =
+    StringRef Word =
         ((Flags & MachineMemOperand::MOLoad) &&
          (Flags & MachineMemOperand::MOStore))
             ? "on"

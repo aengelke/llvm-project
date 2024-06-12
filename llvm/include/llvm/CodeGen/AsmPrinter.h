@@ -705,7 +705,7 @@ public:
   /// Emit a .byte 42 directive that corresponds to an encoding.  If verbose
   /// assembly output is enabled, we output comments describing the encoding.
   /// Desc is a string saying what the encoding is specifying (e.g. "LSDA").
-  void emitEncodingByte(unsigned Val, const char *Desc = nullptr) const;
+  void emitEncodingByte(unsigned Val, StringRef Desc = "") const;
 
   /// Return the size of the encoding in bytes.
   unsigned GetSizeOfEncodedValue(unsigned Encoding) const;

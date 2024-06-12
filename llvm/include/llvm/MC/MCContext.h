@@ -525,11 +525,11 @@ public:
   MCSectionMachO *getMachOSection(StringRef Segment, StringRef Section,
                                   unsigned TypeAndAttributes,
                                   unsigned Reserved2, SectionKind K,
-                                  const char *BeginSymName = nullptr);
+                                  StringRef BeginSymName = "");
 
   MCSectionMachO *getMachOSection(StringRef Segment, StringRef Section,
                                   unsigned TypeAndAttributes, SectionKind K,
-                                  const char *BeginSymName = nullptr) {
+                                  StringRef BeginSymName = "") {
     return getMachOSection(Segment, Section, TypeAndAttributes, 0, K,
                            BeginSymName);
   }
@@ -599,11 +599,11 @@ public:
                                 SectionKind Kind, StringRef COMDATSymName,
                                 int Selection,
                                 unsigned UniqueID = GenericSectionID,
-                                const char *BeginSymName = nullptr);
+                                StringRef BeginSymName = "");
 
   MCSectionCOFF *getCOFFSection(StringRef Section, unsigned Characteristics,
                                 SectionKind Kind,
-                                const char *BeginSymName = nullptr);
+                                StringRef BeginSymName = "");
 
   /// Gets or creates a section equivalent to Sec that is associated with the
   /// section containing KeySym. For example, to create a debug info section
@@ -648,7 +648,7 @@ public:
   MCSectionXCOFF *getXCOFFSection(
       StringRef Section, SectionKind K,
       std::optional<XCOFF::CsectProperties> CsectProp = std::nullopt,
-      bool MultiSymbolsAllowed = false, const char *BeginSymName = nullptr,
+      bool MultiSymbolsAllowed = false, StringRef BeginSymName = "",
       std::optional<XCOFF::DwarfSectionSubtypeFlags> DwarfSubtypeFlags =
           std::nullopt);
 

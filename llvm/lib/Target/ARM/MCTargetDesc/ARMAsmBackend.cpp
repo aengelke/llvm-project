@@ -712,7 +712,7 @@ unsigned ARMAsmBackend::adjustFixupValue(const MCAssembler &Asm,
     if (!STI->hasFeature(ARM::FeatureThumb2) && IsResolved) {
       const char *FixupDiagnostic = reasonForFixupRelaxation(Fixup, Value);
       if (FixupDiagnostic) {
-        Ctx.reportError(Fixup.getLoc(), FixupDiagnostic);
+        Ctx.reportError(Fixup.getLoc(), StringRef(FixupDiagnostic));
         return 0;
       }
     }
@@ -738,7 +738,7 @@ unsigned ARMAsmBackend::adjustFixupValue(const MCAssembler &Asm,
         !STI->hasFeature(ARM::HasV8MBaselineOps)) {
       const char *FixupDiagnostic = reasonForFixupRelaxation(Fixup, Value);
       if (FixupDiagnostic) {
-        Ctx.reportError(Fixup.getLoc(), FixupDiagnostic);
+        Ctx.reportError(Fixup.getLoc(), StringRef(FixupDiagnostic));
         return 0;
       }
     }
@@ -749,7 +749,7 @@ unsigned ARMAsmBackend::adjustFixupValue(const MCAssembler &Asm,
     if (!STI->hasFeature(ARM::FeatureThumb2)) {
       const char *FixupDiagnostic = reasonForFixupRelaxation(Fixup, Value);
       if (FixupDiagnostic) {
-        Ctx.reportError(Fixup.getLoc(), FixupDiagnostic);
+        Ctx.reportError(Fixup.getLoc(), StringRef(FixupDiagnostic));
         return 0;
       }
     }
@@ -855,7 +855,7 @@ unsigned ARMAsmBackend::adjustFixupValue(const MCAssembler &Asm,
   case ARM::fixup_bf_branch: {
     const char *FixupDiagnostic = reasonForFixupRelaxation(Fixup, Value);
     if (FixupDiagnostic) {
-      Ctx.reportError(Fixup.getLoc(), FixupDiagnostic);
+      Ctx.reportError(Fixup.getLoc(), StringRef(FixupDiagnostic));
       return 0;
     }
     uint32_t out = (((Value - 4) >> 1) & 0xf) << 23;
@@ -866,7 +866,7 @@ unsigned ARMAsmBackend::adjustFixupValue(const MCAssembler &Asm,
   case ARM::fixup_bfc_target: {
     const char *FixupDiagnostic = reasonForFixupRelaxation(Fixup, Value);
     if (FixupDiagnostic) {
-      Ctx.reportError(Fixup.getLoc(), FixupDiagnostic);
+      Ctx.reportError(Fixup.getLoc(), StringRef(FixupDiagnostic));
       return 0;
     }
     uint32_t out = 0;
@@ -885,7 +885,7 @@ unsigned ARMAsmBackend::adjustFixupValue(const MCAssembler &Asm,
 
     const char *FixupDiagnostic = reasonForFixupRelaxation(Fixup, Value);
     if (FixupDiagnostic) {
-      Ctx.reportError(Fixup.getLoc(), FixupDiagnostic);
+      Ctx.reportError(Fixup.getLoc(), StringRef(FixupDiagnostic));
       return 0;
     }
     uint32_t out = ((Value >> 2) & 1) << 17;
@@ -895,7 +895,7 @@ unsigned ARMAsmBackend::adjustFixupValue(const MCAssembler &Asm,
   case ARM::fixup_le: {
     const char *FixupDiagnostic = reasonForFixupRelaxation(Fixup, Value);
     if (FixupDiagnostic) {
-      Ctx.reportError(Fixup.getLoc(), FixupDiagnostic);
+      Ctx.reportError(Fixup.getLoc(), StringRef(FixupDiagnostic));
       return 0;
     }
     uint64_t real_value = Value - 4;

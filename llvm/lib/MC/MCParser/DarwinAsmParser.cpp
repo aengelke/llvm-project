@@ -1012,24 +1012,24 @@ bool DarwinAsmParser::parseMajorMinorVersionComponent(unsigned *Major,
                                                       const char *VersionName) {
   // Get the major version number.
   if (getLexer().isNot(AsmToken::Integer))
-    return TokError(Twine("invalid ") + VersionName +
+    return TokError(Twine("invalid ") + StringRef(VersionName) +
                     " major version number, integer expected");
   int64_t MajorVal = getLexer().getTok().getIntVal();
   if (MajorVal > 65535 || MajorVal <= 0)
-    return TokError(Twine("invalid ") + VersionName + " major version number");
+    return TokError(Twine("invalid ") + StringRef(VersionName) + " major version number");
   *Major = (unsigned)MajorVal;
   Lex();
   if (getLexer().isNot(AsmToken::Comma))
-    return TokError(Twine(VersionName) +
+    return TokError(StringRef(VersionName) +
                     " minor version number required, comma expected");
   Lex();
   // Get the minor version number.
   if (getLexer().isNot(AsmToken::Integer))
-    return TokError(Twine("invalid ") + VersionName +
+    return TokError(Twine("invalid ") + StringRef(VersionName) +
                     " minor version number, integer expected");
   int64_t MinorVal = getLexer().getTok().getIntVal();
   if (MinorVal > 255 || MinorVal < 0)
-    return TokError(Twine("invalid ") + VersionName + " minor version number");
+    return TokError(Twine("invalid ") + StringRef(VersionName) + " minor version number");
   *Minor = MinorVal;
   Lex();
   return false;
@@ -1041,11 +1041,11 @@ bool DarwinAsmParser::parseOptionalTrailingVersionComponent(
   assert(getLexer().is(AsmToken::Comma) && "comma expected");
   Lex();
   if (getLexer().isNot(AsmToken::Integer))
-    return TokError(Twine("invalid ") + ComponentName +
+    return TokError(Twine("invalid ") + StringRef(ComponentName) +
                     " version number, integer expected");
   int64_t Val = getLexer().getTok().getIntVal();
   if (Val > 255 || Val < 0)
-    return TokError(Twine("invalid ") + ComponentName + " version number");
+    return TokError(Twine("invalid ") + StringRef(ComponentName) + " version number");
   *Component = Val;
   Lex();
   return false;

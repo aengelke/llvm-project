@@ -1653,7 +1653,7 @@ bool MipsFastISel::fastLowerIntrinsicCall(const IntrinsicInst *II) {
       return false;
     if (!MTI->getLength()->getType()->isIntegerTy(32))
       return false;
-    const char *IntrMemName = isa<MemCpyInst>(II) ? "memcpy" : "memmove";
+    StringRef IntrMemName = isa<MemCpyInst>(II) ? "memcpy" : "memmove";
     return lowerCallTo(II, IntrMemName, II->arg_size() - 1);
   }
   case Intrinsic::memset: {

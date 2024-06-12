@@ -28,7 +28,7 @@ class DomTreeUpdater;
 /// a landing pad.
 class EscapeEnumerator {
   Function &F;
-  const char *CleanupBBName;
+  StringRef CleanupBBName;
 
   Function::iterator StateBB, StateE;
   IRBuilder<> Builder;
@@ -38,7 +38,7 @@ class EscapeEnumerator {
   DomTreeUpdater *DTU;
 
 public:
-  EscapeEnumerator(Function &F, const char *N = "cleanup",
+  EscapeEnumerator(Function &F, StringRef N = "cleanup",
                    bool HandleExceptions = true, DomTreeUpdater *DTU = nullptr)
       : F(F), CleanupBBName(N), StateBB(F.begin()), StateE(F.end()),
         Builder(F.getContext()), HandleExceptions(HandleExceptions), DTU(DTU) {}

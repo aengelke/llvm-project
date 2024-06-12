@@ -7241,8 +7241,8 @@ bool CodeGenPrepare::optimizeSelectInst(SelectInst *SI) {
   if (TrueBlock)
     TrueBlock->setName("select.true.sink");
   if (FalseBlock)
-    FalseBlock->setName(FalseInstrs.size() == 0 ? "select.false"
-                                                : "select.false.sink");
+    FalseBlock->setName(FalseInstrs.size() == 0 ? StringRef("select.false")
+                                                : StringRef("select.false.sink"));
 
   if (IsHugeFunc) {
     if (TrueBlock)

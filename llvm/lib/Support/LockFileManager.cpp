@@ -306,7 +306,7 @@ LockFileManager::waitForUnlock(const unsigned MaxSeconds) {
   // Wait first as this is only called when the lock is known to be held.
   while (Backoff.waitForNextAttempt()) {
     // FIXME: implement event-based waiting
-    if (sys::fs::access(LockFileName.c_str(), sys::fs::AccessMode::Exist) ==
+    if (sys::fs::access(LockFileName, sys::fs::AccessMode::Exist) ==
         errc::no_such_file_or_directory) {
       // If the original file wasn't created, somone thought the lock was dead.
       if (!sys::fs::exists(FileName))

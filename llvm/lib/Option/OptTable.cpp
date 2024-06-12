@@ -580,7 +580,7 @@ InputArgList OptTable::parseArgs(int Argc, char *const *Argv,
   unsigned MAI, MAC;
   opt::InputArgList Args = ParseArgs(ArrayRef(NewArgv), MAI, MAC);
   if (MAC)
-    ErrorFn((Twine(Args.getArgString(MAI)) + ": missing argument").str());
+    ErrorFn((StringRef(Args.getArgString(MAI)) + ": missing argument").str());
 
   // For each unknwon option, call ErrorFn with a formatted error message. The
   // message includes a suggested alternative option spelling if available.

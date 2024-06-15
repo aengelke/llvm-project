@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===-- VEMCCodeEmitter.cpp - Convert VE code to machine code -------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -49,29 +50,29 @@ public:
   ~VEMCCodeEmitter() override = default;
 
   void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 
   // getBinaryCodeForInstr - TableGen'erated function for getting the
   // binary encoding for an instruction.
   uint64_t getBinaryCodeForInstr(const MCInst &MI,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
 
   /// getMachineOpValue - Return binary encoding of operand. If the machine
   /// operand requires relocation, record the relocation and return zero.
   unsigned getMachineOpValue(const MCInst &MI, const MCOperand &MO,
-                             SmallVectorImpl<MCFixup> &Fixups,
+                             VectorWriter<MCFixup> &Fixups,
                              const MCSubtargetInfo &STI) const;
 
   uint64_t getBranchTargetOpValue(const MCInst &MI, unsigned OpNo,
-                                  SmallVectorImpl<MCFixup> &Fixups,
+                                  VectorWriter<MCFixup> &Fixups,
                                   const MCSubtargetInfo &STI) const;
   uint64_t getCCOpValue(const MCInst &MI, unsigned OpNo,
-                        SmallVectorImpl<MCFixup> &Fixups,
+                        VectorWriter<MCFixup> &Fixups,
                         const MCSubtargetInfo &STI) const;
   uint64_t getRDOpValue(const MCInst &MI, unsigned OpNo,
-                        SmallVectorImpl<MCFixup> &Fixups,
+                        VectorWriter<MCFixup> &Fixups,
                         const MCSubtargetInfo &STI) const;
 };
 
@@ -79,7 +80,7 @@ public:
 
 void VEMCCodeEmitter::encodeInstruction(const MCInst &MI,
                                         SmallVectorImpl<char> &CB,
-                                        SmallVectorImpl<MCFixup> &Fixups,
+                                        VectorWriter<MCFixup> &Fixups,
                                         const MCSubtargetInfo &STI) const {
   uint64_t Bits = getBinaryCodeForInstr(MI, Fixups, STI);
   support::endian::write<uint64_t>(CB, Bits, llvm::endianness::little);
@@ -89,7 +90,7 @@ void VEMCCodeEmitter::encodeInstruction(const MCInst &MI,
 
 unsigned VEMCCodeEmitter::getMachineOpValue(const MCInst &MI,
                                             const MCOperand &MO,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   if (MO.isReg())
     return Ctx.getRegisterInfo()->getEncodingValue(MO.getReg());
@@ -115,7 +116,7 @@ unsigned VEMCCodeEmitter::getMachineOpValue(const MCInst &MI,
 
 uint64_t
 VEMCCodeEmitter::getBranchTargetOpValue(const MCInst &MI, unsigned OpNo,
-                                        SmallVectorImpl<MCFixup> &Fixups,
+                                        VectorWriter<MCFixup> &Fixups,
                                         const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isReg() || MO.isImm())
@@ -127,7 +128,7 @@ VEMCCodeEmitter::getBranchTargetOpValue(const MCInst &MI, unsigned OpNo,
 }
 
 uint64_t VEMCCodeEmitter::getCCOpValue(const MCInst &MI, unsigned OpNo,
-                                       SmallVectorImpl<MCFixup> &Fixups,
+                                       VectorWriter<MCFixup> &Fixups,
                                        const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isImm())
@@ -137,7 +138,7 @@ uint64_t VEMCCodeEmitter::getCCOpValue(const MCInst &MI, unsigned OpNo,
 }
 
 uint64_t VEMCCodeEmitter::getRDOpValue(const MCInst &MI, unsigned OpNo,
-                                       SmallVectorImpl<MCFixup> &Fixups,
+                                       VectorWriter<MCFixup> &Fixups,
                                        const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isImm())

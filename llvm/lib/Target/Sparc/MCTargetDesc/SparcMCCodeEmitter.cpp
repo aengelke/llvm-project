@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===-- SparcMCCodeEmitter.cpp - Convert Sparc code to machine code -------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -54,34 +55,34 @@ public:
   ~SparcMCCodeEmitter() override = default;
 
   void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 
   // getBinaryCodeForInstr - TableGen'erated function for getting the
   // binary encoding for an instruction.
   uint64_t getBinaryCodeForInstr(const MCInst &MI,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
 
   /// getMachineOpValue - Return binary encoding of operand. If the machine
   /// operand requires relocation, record the relocation and return zero.
   unsigned getMachineOpValue(const MCInst &MI, const MCOperand &MO,
-                             SmallVectorImpl<MCFixup> &Fixups,
+                             VectorWriter<MCFixup> &Fixups,
                              const MCSubtargetInfo &STI) const;
   unsigned getCallTargetOpValue(const MCInst &MI, unsigned OpNo,
-                             SmallVectorImpl<MCFixup> &Fixups,
-                             const MCSubtargetInfo &STI) const;
+                                VectorWriter<MCFixup> &Fixups,
+                                const MCSubtargetInfo &STI) const;
   unsigned getBranchTargetOpValue(const MCInst &MI, unsigned OpNo,
-                             SmallVectorImpl<MCFixup> &Fixups,
-                             const MCSubtargetInfo &STI) const;
+                                  VectorWriter<MCFixup> &Fixups,
+                                  const MCSubtargetInfo &STI) const;
   unsigned getSImm13OpValue(const MCInst &MI, unsigned OpNo,
-                            SmallVectorImpl<MCFixup> &Fixups,
+                            VectorWriter<MCFixup> &Fixups,
                             const MCSubtargetInfo &STI) const;
   unsigned getBranchPredTargetOpValue(const MCInst &MI, unsigned OpNo,
-                                      SmallVectorImpl<MCFixup> &Fixups,
+                                      VectorWriter<MCFixup> &Fixups,
                                       const MCSubtargetInfo &STI) const;
   unsigned getBranchOnRegTargetOpValue(const MCInst &MI, unsigned OpNo,
-                                       SmallVectorImpl<MCFixup> &Fixups,
+                                       VectorWriter<MCFixup> &Fixups,
                                        const MCSubtargetInfo &STI) const;
 };
 
@@ -89,7 +90,7 @@ public:
 
 void SparcMCCodeEmitter::encodeInstruction(const MCInst &MI,
                                            SmallVectorImpl<char> &CB,
-                                           SmallVectorImpl<MCFixup> &Fixups,
+                                           VectorWriter<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
   unsigned Bits = getBinaryCodeForInstr(MI, Fixups, STI);
   support::endian::write(CB, Bits,
@@ -118,10 +119,10 @@ void SparcMCCodeEmitter::encodeInstruction(const MCInst &MI,
   ++MCNumEmitted;  // Keep track of the # of mi's emitted.
 }
 
-unsigned SparcMCCodeEmitter::
-getMachineOpValue(const MCInst &MI, const MCOperand &MO,
-                  SmallVectorImpl<MCFixup> &Fixups,
-                  const MCSubtargetInfo &STI) const {
+unsigned
+SparcMCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
+                                      VectorWriter<MCFixup> &Fixups,
+                                      const MCSubtargetInfo &STI) const {
   if (MO.isReg())
     return Ctx.getRegisterInfo()->getEncodingValue(MO.getReg());
 
@@ -146,7 +147,7 @@ getMachineOpValue(const MCInst &MI, const MCOperand &MO,
 
 unsigned
 SparcMCCodeEmitter::getSImm13OpValue(const MCInst &MI, unsigned OpNo,
-                                     SmallVectorImpl<MCFixup> &Fixups,
+                                     VectorWriter<MCFixup> &Fixups,
                                      const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
 
@@ -175,10 +176,10 @@ SparcMCCodeEmitter::getSImm13OpValue(const MCInst &MI, unsigned OpNo,
   return 0;
 }
 
-unsigned SparcMCCodeEmitter::
-getCallTargetOpValue(const MCInst &MI, unsigned OpNo,
-                     SmallVectorImpl<MCFixup> &Fixups,
-                     const MCSubtargetInfo &STI) const {
+unsigned
+SparcMCCodeEmitter::getCallTargetOpValue(const MCInst &MI, unsigned OpNo,
+                                         VectorWriter<MCFixup> &Fixups,
+                                         const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   const MCExpr *Expr = MO.getExpr();
   const SparcMCExpr *SExpr = dyn_cast<SparcMCExpr>(Expr);
@@ -202,10 +203,10 @@ getCallTargetOpValue(const MCInst &MI, unsigned OpNo,
   return 0;
 }
 
-unsigned SparcMCCodeEmitter::
-getBranchTargetOpValue(const MCInst &MI, unsigned OpNo,
-                  SmallVectorImpl<MCFixup> &Fixups,
-                  const MCSubtargetInfo &STI) const {
+unsigned
+SparcMCCodeEmitter::getBranchTargetOpValue(const MCInst &MI, unsigned OpNo,
+                                           VectorWriter<MCFixup> &Fixups,
+                                           const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isReg() || MO.isImm())
     return getMachineOpValue(MI, MO, Fixups, STI);
@@ -215,10 +216,9 @@ getBranchTargetOpValue(const MCInst &MI, unsigned OpNo,
   return 0;
 }
 
-unsigned SparcMCCodeEmitter::
-getBranchPredTargetOpValue(const MCInst &MI, unsigned OpNo,
-                           SmallVectorImpl<MCFixup> &Fixups,
-                           const MCSubtargetInfo &STI) const {
+unsigned SparcMCCodeEmitter::getBranchPredTargetOpValue(
+    const MCInst &MI, unsigned OpNo, VectorWriter<MCFixup> &Fixups,
+    const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isReg() || MO.isImm())
     return getMachineOpValue(MI, MO, Fixups, STI);
@@ -228,10 +228,9 @@ getBranchPredTargetOpValue(const MCInst &MI, unsigned OpNo,
   return 0;
 }
 
-unsigned SparcMCCodeEmitter::
-getBranchOnRegTargetOpValue(const MCInst &MI, unsigned OpNo,
-                           SmallVectorImpl<MCFixup> &Fixups,
-                           const MCSubtargetInfo &STI) const {
+unsigned SparcMCCodeEmitter::getBranchOnRegTargetOpValue(
+    const MCInst &MI, unsigned OpNo, VectorWriter<MCFixup> &Fixups,
+    const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isReg() || MO.isImm())
     return getMachineOpValue(MI, MO, Fixups, STI);

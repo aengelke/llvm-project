@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===-- AVRMCCodeEmitter.h - Convert AVR Code to Machine Code -------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -49,42 +50,42 @@ private:
   /// Gets the encoding for a conditional branch target.
   template <AVR::Fixups Fixup>
   unsigned encodeRelCondBrTarget(const MCInst &MI, unsigned OpNo,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
 
   /// Encodes the `PTRREGS` operand to a load or store instruction.
   unsigned encodeLDSTPtrReg(const MCInst &MI, unsigned OpNo,
-                            SmallVectorImpl<MCFixup> &Fixups,
+                            VectorWriter<MCFixup> &Fixups,
                             const MCSubtargetInfo &STI) const;
 
   /// Encodes a `register+immediate` operand for `LDD`/`STD`.
   unsigned encodeMemri(const MCInst &MI, unsigned OpNo,
-                       SmallVectorImpl<MCFixup> &Fixups,
+                       VectorWriter<MCFixup> &Fixups,
                        const MCSubtargetInfo &STI) const;
 
   /// Takes the complement of a number (~0 - val).
   unsigned encodeComplement(const MCInst &MI, unsigned OpNo,
-                            SmallVectorImpl<MCFixup> &Fixups,
+                            VectorWriter<MCFixup> &Fixups,
                             const MCSubtargetInfo &STI) const;
 
   /// Encodes an immediate value with a given fixup.
   /// \tparam Offset The offset into the instruction for the fixup.
   template <AVR::Fixups Fixup, unsigned Offset>
   unsigned encodeImm(const MCInst &MI, unsigned OpNo,
-                     SmallVectorImpl<MCFixup> &Fixups,
+                     VectorWriter<MCFixup> &Fixups,
                      const MCSubtargetInfo &STI) const;
 
   /// Gets the encoding of the target for the `CALL k` instruction.
   unsigned encodeCallTarget(const MCInst &MI, unsigned OpNo,
-                            SmallVectorImpl<MCFixup> &Fixups,
+                            VectorWriter<MCFixup> &Fixups,
                             const MCSubtargetInfo &STI) const;
 
   /// TableGen'ed function to get the binary encoding for an instruction.
   uint64_t getBinaryCodeForInstr(const MCInst &MI,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
 
-  unsigned getExprOpValue(const MCExpr *Expr, SmallVectorImpl<MCFixup> &Fixups,
+  unsigned getExprOpValue(const MCExpr *Expr, VectorWriter<MCFixup> &Fixups,
                           const MCSubtargetInfo &STI) const;
 
   /// Returns the binary encoding of operand.
@@ -92,11 +93,11 @@ private:
   /// If the machine operand requires relocation, the relocation is recorded
   /// and zero is returned.
   unsigned getMachineOpValue(const MCInst &MI, const MCOperand &MO,
-                             SmallVectorImpl<MCFixup> &Fixups,
+                             VectorWriter<MCFixup> &Fixups,
                              const MCSubtargetInfo &STI) const;
 
   void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 
   AVRMCCodeEmitter(const AVRMCCodeEmitter &) = delete;

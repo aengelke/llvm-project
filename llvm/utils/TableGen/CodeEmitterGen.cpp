@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===- CodeEmitterGen.cpp - Code Emitter Generator ------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -510,14 +511,14 @@ void CodeEmitterGen::run(raw_ostream &o) {
     if (UseAPInt) {
       o << "void " << Target.getName()
         << "MCCodeEmitter::getBinaryCodeForInstr(const MCInst &MI,\n"
-        << "    SmallVectorImpl<MCFixup> &Fixups,\n"
+        << "    VectorWriter<MCFixup> &Fixups,\n"
         << "    APInt &Inst,\n"
         << "    APInt &Scratch,\n"
         << "    const MCSubtargetInfo &STI) const {\n";
     } else {
       o << "uint64_t " << Target.getName();
       o << "MCCodeEmitter::getBinaryCodeForInstr(const MCInst &MI,\n"
-        << "    SmallVectorImpl<MCFixup> &Fixups,\n"
+        << "    VectorWriter<MCFixup> &Fixups,\n"
         << "    const MCSubtargetInfo &STI) const {\n";
     }
 

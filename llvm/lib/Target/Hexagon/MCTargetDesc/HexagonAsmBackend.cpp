@@ -49,15 +49,15 @@ class HexagonAsmBackend : public MCAsmBackend {
 
   void ReplaceInstruction(MCContext &Ctx, MCCodeEmitter &E,
                           MCRelaxableFragment &RF, MCInst &HMB) const {
-    SmallVector<MCFixup, 4> Fixups;
-    SmallString<256> Code;
-    E.encodeInstruction(HMB, Code, Fixups, *RF.getSubtargetInfo());
-
     // Update the fragment.
+    RF.clearFixups();
+
+    SmallString<256> Code;
+    E.encodeInstruction(HMB, Code, RF.getFixupWriter(Ctx),
+                        *RF.getSubtargetInfo());
+
     RF.setInst(HMB);
     RF.getContents() = Code;
-    RF.clearFixups();
-    RF.getFixupWriter(Ctx).append(Fixups);
   }
 
 public:

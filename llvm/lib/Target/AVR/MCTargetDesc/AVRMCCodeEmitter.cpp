@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===-- AVRMCCodeEmitter.cpp - Convert AVR Code to Machine Code -----------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -91,7 +92,7 @@ AVRMCCodeEmitter::loadStorePostEncoder(const MCInst &MI, unsigned EncodedValue,
 template <AVR::Fixups Fixup>
 unsigned
 AVRMCCodeEmitter::encodeRelCondBrTarget(const MCInst &MI, unsigned OpNo,
-                                        SmallVectorImpl<MCFixup> &Fixups,
+                                        VectorWriter<MCFixup> &Fixups,
                                         const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
 
@@ -111,7 +112,7 @@ AVRMCCodeEmitter::encodeRelCondBrTarget(const MCInst &MI, unsigned OpNo,
 }
 
 unsigned AVRMCCodeEmitter::encodeLDSTPtrReg(const MCInst &MI, unsigned OpNo,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   auto MO = MI.getOperand(OpNo);
 
@@ -135,7 +136,7 @@ unsigned AVRMCCodeEmitter::encodeLDSTPtrReg(const MCInst &MI, unsigned OpNo,
 /// * The lower 6 bits is the immediate
 /// * The upper bit is the pointer register bit (Z=0,Y=1)
 unsigned AVRMCCodeEmitter::encodeMemri(const MCInst &MI, unsigned OpNo,
-                                       SmallVectorImpl<MCFixup> &Fixups,
+                                       VectorWriter<MCFixup> &Fixups,
                                        const MCSubtargetInfo &STI) const {
   auto RegOp = MI.getOperand(OpNo);
   auto OffsetOp = MI.getOperand(OpNo + 1);
@@ -172,7 +173,7 @@ unsigned AVRMCCodeEmitter::encodeMemri(const MCInst &MI, unsigned OpNo,
 }
 
 unsigned AVRMCCodeEmitter::encodeComplement(const MCInst &MI, unsigned OpNo,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   // The operand should be an immediate.
   assert(MI.getOperand(OpNo).isImm());
@@ -183,7 +184,7 @@ unsigned AVRMCCodeEmitter::encodeComplement(const MCInst &MI, unsigned OpNo,
 
 template <AVR::Fixups Fixup, unsigned Offset>
 unsigned AVRMCCodeEmitter::encodeImm(const MCInst &MI, unsigned OpNo,
-                                     SmallVectorImpl<MCFixup> &Fixups,
+                                     VectorWriter<MCFixup> &Fixups,
                                      const MCSubtargetInfo &STI) const {
   auto MO = MI.getOperand(OpNo);
 
@@ -208,7 +209,7 @@ unsigned AVRMCCodeEmitter::encodeImm(const MCInst &MI, unsigned OpNo,
 }
 
 unsigned AVRMCCodeEmitter::encodeCallTarget(const MCInst &MI, unsigned OpNo,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   auto MO = MI.getOperand(OpNo);
 
@@ -226,7 +227,7 @@ unsigned AVRMCCodeEmitter::encodeCallTarget(const MCInst &MI, unsigned OpNo,
 }
 
 unsigned AVRMCCodeEmitter::getExprOpValue(const MCExpr *Expr,
-                                          SmallVectorImpl<MCFixup> &Fixups,
+                                          VectorWriter<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
 
   MCExpr::ExprKind Kind = Expr->getKind();
@@ -254,7 +255,7 @@ unsigned AVRMCCodeEmitter::getExprOpValue(const MCExpr *Expr,
 
 unsigned AVRMCCodeEmitter::getMachineOpValue(const MCInst &MI,
                                              const MCOperand &MO,
-                                             SmallVectorImpl<MCFixup> &Fixups,
+                                             VectorWriter<MCFixup> &Fixups,
                                              const MCSubtargetInfo &STI) const {
   if (MO.isReg())
     return Ctx.getRegisterInfo()->getEncodingValue(MO.getReg());
@@ -272,7 +273,7 @@ unsigned AVRMCCodeEmitter::getMachineOpValue(const MCInst &MI,
 
 void AVRMCCodeEmitter::encodeInstruction(const MCInst &MI,
                                          SmallVectorImpl<char> &CB,
-                                         SmallVectorImpl<MCFixup> &Fixups,
+                                         VectorWriter<MCFixup> &Fixups,
                                          const MCSubtargetInfo &STI) const {
   const MCInstrDesc &Desc = MCII.get(MI.getOpcode());
 

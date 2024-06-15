@@ -484,16 +484,15 @@ void MCMachOStreamer::emitInstToData(const MCInst &Inst,
                                      const MCSubtargetInfo &STI) {
   MCDataFragment *DF = getOrCreateDataFragment();
 
-  SmallVector<MCFixup, 4> Fixups;
-  SmallString<256> Code;
-  getAssembler().getEmitter().encodeInstruction(Inst, Code, Fixups, STI);
+  size_t FixupStartIdx = DF->getFixups().size();
+  size_t CodeOffset = DF->getContents().size();
+  getAssembler().getEmitter().encodeInstruction(
+      Inst, DF->getContents(), DF->getFixupWriter(getContext()), STI);
 
   // Add the fixups and data.
-  for (MCFixup &Fixup : Fixups)
-    Fixup.setOffset(Fixup.getOffset() + DF->getContents().size());
+  for (MCFixup &Fixup : DF->getFixups().slice(FixupStartIdx))
+    Fixup.setOffset(Fixup.getOffset() + CodeOffset);
   DF->setHasInstructions(STI);
-  DF->getContents().append(Code.begin(), Code.end());
-  DF->getFixupWriter(getContext()).append(Fixups);
 }
 
 void MCMachOStreamer::finishImpl() {

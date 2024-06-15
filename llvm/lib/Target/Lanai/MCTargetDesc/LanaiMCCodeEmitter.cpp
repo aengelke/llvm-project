@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===-- LanaiMCCodeEmitter.cpp - Convert Lanai code to machine code -------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -50,33 +51,33 @@ public:
   // getBinaryCodeForInstr - TableGen'erated function for getting the
   // binary encoding for an instruction.
   uint64_t getBinaryCodeForInstr(const MCInst &Inst,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &SubtargetInfo) const;
 
   // getMachineOpValue - Return binary encoding of operand. If the machine
   // operand requires relocation, record the relocation and return zero.
   unsigned getMachineOpValue(const MCInst &Inst, const MCOperand &MCOp,
-                             SmallVectorImpl<MCFixup> &Fixups,
+                             VectorWriter<MCFixup> &Fixups,
                              const MCSubtargetInfo &SubtargetInfo) const;
 
   unsigned getRiMemoryOpValue(const MCInst &Inst, unsigned OpNo,
-                              SmallVectorImpl<MCFixup> &Fixups,
+                              VectorWriter<MCFixup> &Fixups,
                               const MCSubtargetInfo &SubtargetInfo) const;
 
   unsigned getRrMemoryOpValue(const MCInst &Inst, unsigned OpNo,
-                              SmallVectorImpl<MCFixup> &Fixups,
+                              VectorWriter<MCFixup> &Fixups,
                               const MCSubtargetInfo &SubtargetInfo) const;
 
   unsigned getSplsOpValue(const MCInst &Inst, unsigned OpNo,
-                          SmallVectorImpl<MCFixup> &Fixups,
+                          VectorWriter<MCFixup> &Fixups,
                           const MCSubtargetInfo &SubtargetInfo) const;
 
   unsigned getBranchTargetOpValue(const MCInst &Inst, unsigned OpNo,
-                                  SmallVectorImpl<MCFixup> &Fixups,
+                                  VectorWriter<MCFixup> &Fixups,
                                   const MCSubtargetInfo &SubtargetInfo) const;
 
   void encodeInstruction(const MCInst &Inst, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &SubtargetInfo) const override;
 
   unsigned adjustPqBitsRmAndRrm(const MCInst &Inst, unsigned Value,
@@ -108,7 +109,7 @@ static Lanai::Fixups FixupKind(const MCExpr *Expr) {
 // getMachineOpValue - Return binary encoding of operand. If the machine
 // operand requires relocation, record the relocation and return zero.
 unsigned LanaiMCCodeEmitter::getMachineOpValue(
-    const MCInst &Inst, const MCOperand &MCOp, SmallVectorImpl<MCFixup> &Fixups,
+    const MCInst &Inst, const MCOperand &MCOp, VectorWriter<MCFixup> &Fixups,
     const MCSubtargetInfo &SubtargetInfo) const {
   if (MCOp.isReg())
     return getLanaiRegisterNumbering(MCOp.getReg());
@@ -172,8 +173,7 @@ LanaiMCCodeEmitter::adjustPqBitsSpls(const MCInst &Inst, unsigned Value,
 
 void LanaiMCCodeEmitter::encodeInstruction(
     const MCInst &Inst, SmallVectorImpl<char> &CB,
-    SmallVectorImpl<MCFixup> &Fixups,
-    const MCSubtargetInfo &SubtargetInfo) const {
+    VectorWriter<MCFixup> &Fixups, const MCSubtargetInfo &SubtargetInfo) const {
   // Get instruction encoding and emit it
   unsigned Value = getBinaryCodeForInstr(Inst, Fixups, SubtargetInfo);
   ++MCNumEmitted; // Keep track of the number of emitted insns.
@@ -183,7 +183,7 @@ void LanaiMCCodeEmitter::encodeInstruction(
 
 // Encode Lanai Memory Operand
 unsigned LanaiMCCodeEmitter::getRiMemoryOpValue(
-    const MCInst &Inst, unsigned OpNo, SmallVectorImpl<MCFixup> &Fixups,
+    const MCInst &Inst, unsigned OpNo, VectorWriter<MCFixup> &Fixups,
     const MCSubtargetInfo &SubtargetInfo) const {
   unsigned Encoding;
   const MCOperand Op1 = Inst.getOperand(OpNo + 0);
@@ -215,7 +215,7 @@ unsigned LanaiMCCodeEmitter::getRiMemoryOpValue(
 }
 
 unsigned LanaiMCCodeEmitter::getRrMemoryOpValue(
-    const MCInst &Inst, unsigned OpNo, SmallVectorImpl<MCFixup> &Fixups,
+    const MCInst &Inst, unsigned OpNo, VectorWriter<MCFixup> &Fixups,
     const MCSubtargetInfo &SubtargetInfo) const {
   unsigned Encoding;
   const MCOperand Op1 = Inst.getOperand(OpNo + 0);
@@ -254,7 +254,7 @@ unsigned LanaiMCCodeEmitter::getRrMemoryOpValue(
 
 unsigned
 LanaiMCCodeEmitter::getSplsOpValue(const MCInst &Inst, unsigned OpNo,
-                                   SmallVectorImpl<MCFixup> &Fixups,
+                                   VectorWriter<MCFixup> &Fixups,
                                    const MCSubtargetInfo &SubtargetInfo) const {
   unsigned Encoding;
   const MCOperand Op1 = Inst.getOperand(OpNo + 0);
@@ -286,7 +286,7 @@ LanaiMCCodeEmitter::getSplsOpValue(const MCInst &Inst, unsigned OpNo,
 }
 
 unsigned LanaiMCCodeEmitter::getBranchTargetOpValue(
-    const MCInst &Inst, unsigned OpNo, SmallVectorImpl<MCFixup> &Fixups,
+    const MCInst &Inst, unsigned OpNo, VectorWriter<MCFixup> &Fixups,
     const MCSubtargetInfo &SubtargetInfo) const {
   const MCOperand &MCOp = Inst.getOperand(OpNo);
   if (MCOp.isReg() || MCOp.isImm())

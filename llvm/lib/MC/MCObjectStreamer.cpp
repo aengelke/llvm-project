@@ -469,10 +469,9 @@ void MCObjectStreamer::emitInstToFragment(const MCInst &Inst,
   insert(IF);
 
   SmallString<128> Code;
-  SmallVector<MCFixup> Fixups;
-  getAssembler().getEmitter().encodeInstruction(Inst, Code, Fixups, STI);
+  getAssembler().getEmitter().encodeInstruction(
+      Inst, Code, IF->getFixupWriter(getContext()), STI);
   IF->getContents().append(Code.begin(), Code.end());
-  IF->getFixupWriter(getContext()).append(Fixups);
 }
 
 #ifndef NDEBUG

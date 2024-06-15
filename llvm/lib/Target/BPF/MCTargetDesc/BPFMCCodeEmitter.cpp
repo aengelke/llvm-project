@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===-- BPFMCCodeEmitter.cpp - Convert BPF code to machine code -----------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -46,21 +47,21 @@ public:
   // getBinaryCodeForInstr - TableGen'erated function for getting the
   // binary encoding for an instruction.
   uint64_t getBinaryCodeForInstr(const MCInst &MI,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
 
   // getMachineOpValue - Return binary encoding of operand. If the machin
   // operand requires relocation, record the relocation and return zero.
   unsigned getMachineOpValue(const MCInst &MI, const MCOperand &MO,
-                             SmallVectorImpl<MCFixup> &Fixups,
+                             VectorWriter<MCFixup> &Fixups,
                              const MCSubtargetInfo &STI) const;
 
   uint64_t getMemoryOpValue(const MCInst &MI, unsigned Op,
-                            SmallVectorImpl<MCFixup> &Fixups,
+                            VectorWriter<MCFixup> &Fixups,
                             const MCSubtargetInfo &STI) const;
 
   void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 };
 
@@ -78,7 +79,7 @@ MCCodeEmitter *llvm::createBPFbeMCCodeEmitter(const MCInstrInfo &MCII,
 
 unsigned BPFMCCodeEmitter::getMachineOpValue(const MCInst &MI,
                                              const MCOperand &MO,
-                                             SmallVectorImpl<MCFixup> &Fixups,
+                                             VectorWriter<MCFixup> &Fixups,
                                              const MCSubtargetInfo &STI) const {
   if (MO.isReg())
     return MRI.getEncodingValue(MO.getReg());
@@ -112,7 +113,7 @@ static uint8_t SwapBits(uint8_t Val)
 
 void BPFMCCodeEmitter::encodeInstruction(const MCInst &MI,
                                          SmallVectorImpl<char> &CB,
-                                         SmallVectorImpl<MCFixup> &Fixups,
+                                         VectorWriter<MCFixup> &Fixups,
                                          const MCSubtargetInfo &STI) const {
   unsigned Opcode = MI.getOpcode();
   raw_svector_ostream OS(CB);
@@ -150,7 +151,7 @@ void BPFMCCodeEmitter::encodeInstruction(const MCInst &MI,
 
 // Encode BPF Memory Operand
 uint64_t BPFMCCodeEmitter::getMemoryOpValue(const MCInst &MI, unsigned Op,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   // For CMPXCHG instructions, output is implicitly in R0/W0,
   // so memory operand starts from operand 0.

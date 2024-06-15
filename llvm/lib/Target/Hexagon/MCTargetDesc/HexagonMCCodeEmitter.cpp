@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===- HexagonMCCodeEmitter.cpp - Hexagon Target Descriptions -------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -366,7 +367,7 @@ uint32_t HexagonMCCodeEmitter::parseBits(size_t Last, MCInst const &MCB,
 /// Emit the bundle.
 void HexagonMCCodeEmitter::encodeInstruction(const MCInst &MI,
                                              SmallVectorImpl<char> &CB,
-                                             SmallVectorImpl<MCFixup> &Fixups,
+                                             VectorWriter<MCFixup> &Fixups,
                                              const MCSubtargetInfo &STI) const {
   MCInst &HMB = const_cast<MCInst &>(MI);
 
@@ -396,9 +397,8 @@ static bool RegisterMatches(unsigned Consumer, unsigned Producer,
 }
 
 void HexagonMCCodeEmitter::encodeSingleInstruction(
-    const MCInst &MI, SmallVectorImpl<char> &CB,
-    SmallVectorImpl<MCFixup> &Fixups, const MCSubtargetInfo &STI,
-    uint32_t Parse) const {
+    const MCInst &MI, SmallVectorImpl<char> &CB, VectorWriter<MCFixup> &Fixups,
+    const MCSubtargetInfo &STI, uint32_t Parse) const {
   assert(!HexagonMCInstrInfo::isBundle(MI));
   uint64_t Binary;
 
@@ -573,9 +573,9 @@ static bool isPCRel(unsigned Kind) {
   }
 }
 
-unsigned HexagonMCCodeEmitter::getExprOpValue(const MCInst &MI,
-      const MCOperand &MO, const MCExpr *ME, SmallVectorImpl<MCFixup> &Fixups,
-      const MCSubtargetInfo &STI) const {
+unsigned HexagonMCCodeEmitter::getExprOpValue(
+    const MCInst &MI, const MCOperand &MO, const MCExpr *ME,
+    VectorWriter<MCFixup> &Fixups, const MCSubtargetInfo &STI) const {
   if (isa<HexagonMCExpr>(ME))
     ME = &HexagonMCInstrInfo::getExpr(*ME);
   int64_t Value;
@@ -706,7 +706,7 @@ unsigned HexagonMCCodeEmitter::getExprOpValue(const MCInst &MI,
 
 unsigned
 HexagonMCCodeEmitter::getMachineOpValue(MCInst const &MI, MCOperand const &MO,
-                                        SmallVectorImpl<MCFixup> &Fixups,
+                                        VectorWriter<MCFixup> &Fixups,
                                         MCSubtargetInfo const &STI) const {
   size_t OperandNumber = ~0U;
   for (unsigned i = 0, n = MI.getNumOperands(); i < n; ++i)

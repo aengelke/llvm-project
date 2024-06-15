@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===- R600MCCodeEmitter.cpp - Code Emitter for R600->Cayman GPU families -===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -40,12 +41,12 @@ public:
 
   /// Encode the instruction and write it to the OS.
   void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 
   /// \returns the encoding for an MCOperand.
   uint64_t getMachineOpValue(const MCInst &MI, const MCOperand &MO,
-                             SmallVectorImpl<MCFixup> &Fixups,
+                             VectorWriter<MCFixup> &Fixups,
                              const MCSubtargetInfo &STI) const;
 
 private:
@@ -55,7 +56,7 @@ private:
   unsigned getHWReg(unsigned regNo) const;
 
   uint64_t getBinaryCodeForInstr(const MCInst &MI,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
 };
 
@@ -85,7 +86,7 @@ MCCodeEmitter *llvm::createR600MCCodeEmitter(const MCInstrInfo &MCII,
 
 void R600MCCodeEmitter::encodeInstruction(const MCInst &MI,
                                           SmallVectorImpl<char> &CB,
-                                          SmallVectorImpl<MCFixup> &Fixups,
+                                          VectorWriter<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
   const MCInstrDesc &Desc = MCII.get(MI.getOpcode());
   if (MI.getOpcode() == R600::RETURN ||
@@ -153,10 +154,10 @@ unsigned R600MCCodeEmitter::getHWReg(unsigned RegNo) const {
   return MRI.getEncodingValue(RegNo) & HW_REG_MASK;
 }
 
-uint64_t R600MCCodeEmitter::getMachineOpValue(const MCInst &MI,
-                                              const MCOperand &MO,
-                                        SmallVectorImpl<MCFixup> &Fixups,
-                                        const MCSubtargetInfo &STI) const {
+uint64_t
+R600MCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
+                                     VectorWriter<MCFixup> &Fixups,
+                                     const MCSubtargetInfo &STI) const {
   if (MO.isReg()) {
     if (HAS_NATIVE_OPERANDS(MCII.get(MI.getOpcode()).TSFlags))
       return MRI.getEncodingValue(MO.getReg());

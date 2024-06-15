@@ -142,19 +142,16 @@ void MCXCOFFStreamer::emitZerofill(MCSection *Section, MCSymbol *Symbol,
 void MCXCOFFStreamer::emitInstToData(const MCInst &Inst,
                                      const MCSubtargetInfo &STI) {
   MCAssembler &Assembler = getAssembler();
-  SmallVector<MCFixup, 4> Fixups;
-  SmallString<256> Code;
-  Assembler.getEmitter().encodeInstruction(Inst, Code, Fixups, STI);
-
-  // Add the fixups and data.
   MCDataFragment *DF = getOrCreateDataFragment(&STI);
-  const size_t ContentsSize = DF->getContents().size();
-  for (auto &Fixup : Fixups)
-    Fixup.setOffset(Fixup.getOffset() + ContentsSize);
 
+  size_t FixupStartIdx = DF->getFixups().size();
+  size_t CodeOffset = DF->getContents().size();
+  Assembler.getEmitter().encodeInstruction(
+      Inst, DF->getContents(), DF->getFixupWriter(getContext()), STI);
+
+  for (auto &Fixup : DF->getFixups().slice(FixupStartIdx))
+    Fixup.setOffset(Fixup.getOffset() + CodeOffset);
   DF->setHasInstructions(STI);
-  DF->getContents().append(Code.begin(), Code.end());
-  DF->getFixupWriter(getContext()).append(Fixups);
 }
 
 MCStreamer *llvm::createXCOFFStreamer(MCContext &Context,

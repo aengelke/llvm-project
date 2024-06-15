@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===-- MSP430MCCodeEmitter.cpp - Convert MSP430 code to machine code -----===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -43,7 +44,7 @@ class MSP430MCCodeEmitter : public MCCodeEmitter {
   /// TableGen'erated function for getting the binary encoding for an
   /// instruction.
   uint64_t getBinaryCodeForInstr(const MCInst &MI,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
 
   /// Returns the binary encoding of operands.
@@ -51,23 +52,23 @@ class MSP430MCCodeEmitter : public MCCodeEmitter {
   /// If an operand requires relocation, the relocation is recorded
   /// and zero is returned.
   unsigned getMachineOpValue(const MCInst &MI, const MCOperand &MO,
-                             SmallVectorImpl<MCFixup> &Fixups,
+                             VectorWriter<MCFixup> &Fixups,
                              const MCSubtargetInfo &STI) const;
 
   unsigned getMemOpValue(const MCInst &MI, unsigned Op,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const;
 
   unsigned getPCRelImmOpValue(const MCInst &MI, unsigned Op,
-                              SmallVectorImpl<MCFixup> &Fixups,
+                              VectorWriter<MCFixup> &Fixups,
                               const MCSubtargetInfo &STI) const;
 
   unsigned getCGImmOpValue(const MCInst &MI, unsigned Op,
-                           SmallVectorImpl<MCFixup> &Fixups,
+                           VectorWriter<MCFixup> &Fixups,
                            const MCSubtargetInfo &STI) const;
 
   unsigned getCCOpValue(const MCInst &MI, unsigned Op,
-                        SmallVectorImpl<MCFixup> &Fixups,
+                        VectorWriter<MCFixup> &Fixups,
                         const MCSubtargetInfo &STI) const;
 
 public:
@@ -75,13 +76,13 @@ public:
       : Ctx(ctx), MCII(MCII) {}
 
   void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 };
 
 void MSP430MCCodeEmitter::encodeInstruction(const MCInst &MI,
                                             SmallVectorImpl<char> &CB,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   const MCInstrDesc &Desc = MCII.get(MI.getOpcode());
   // Get byte count of instruction.
@@ -100,10 +101,10 @@ void MSP430MCCodeEmitter::encodeInstruction(const MCInst &MI,
   }
 }
 
-unsigned MSP430MCCodeEmitter::getMachineOpValue(const MCInst &MI,
-                                                const MCOperand &MO,
-                                                SmallVectorImpl<MCFixup> &Fixups,
-                                                const MCSubtargetInfo &STI) const {
+unsigned
+MSP430MCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
+                                       VectorWriter<MCFixup> &Fixups,
+                                       const MCSubtargetInfo &STI) const {
   if (MO.isReg())
     return Ctx.getRegisterInfo()->getEncodingValue(MO.getReg());
 
@@ -120,7 +121,7 @@ unsigned MSP430MCCodeEmitter::getMachineOpValue(const MCInst &MI,
 }
 
 unsigned MSP430MCCodeEmitter::getMemOpValue(const MCInst &MI, unsigned Op,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   const MCOperand &MO1 = MI.getOperand(Op);
   assert(MO1.isReg() && "Register operand expected");
@@ -151,9 +152,10 @@ unsigned MSP430MCCodeEmitter::getMemOpValue(const MCInst &MI, unsigned Op,
   return Reg;
 }
 
-unsigned MSP430MCCodeEmitter::getPCRelImmOpValue(const MCInst &MI, unsigned Op,
-                                                 SmallVectorImpl<MCFixup> &Fixups,
-                                                 const MCSubtargetInfo &STI) const {
+unsigned
+MSP430MCCodeEmitter::getPCRelImmOpValue(const MCInst &MI, unsigned Op,
+                                        VectorWriter<MCFixup> &Fixups,
+                                        const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(Op);
   if (MO.isImm())
     return MO.getImm();
@@ -164,9 +166,10 @@ unsigned MSP430MCCodeEmitter::getPCRelImmOpValue(const MCInst &MI, unsigned Op,
   return 0;
 }
 
-unsigned MSP430MCCodeEmitter::getCGImmOpValue(const MCInst &MI, unsigned Op,
-                                              SmallVectorImpl<MCFixup> &Fixups,
-                                              const MCSubtargetInfo &STI) const {
+unsigned
+MSP430MCCodeEmitter::getCGImmOpValue(const MCInst &MI, unsigned Op,
+                                     VectorWriter<MCFixup> &Fixups,
+                                     const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(Op);
   assert(MO.isImm() && "Expr operand expected");
 
@@ -184,7 +187,7 @@ unsigned MSP430MCCodeEmitter::getCGImmOpValue(const MCInst &MI, unsigned Op,
 }
 
 unsigned MSP430MCCodeEmitter::getCCOpValue(const MCInst &MI, unsigned Op,
-                                           SmallVectorImpl<MCFixup> &Fixups,
+                                           VectorWriter<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(Op);
   assert(MO.isImm() && "Immediate operand expected");

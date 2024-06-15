@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===- llvm/MC/MCCodeEmitter.h - Instruction Encoding -----------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -38,8 +39,14 @@ public:
                           const MCSubtargetInfo &STI) const {}
   /// Encode the given \p Inst to bytes and append to \p CB.
   virtual void encodeInstruction(const MCInst &Inst, SmallVectorImpl<char> &CB,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const = 0;
+  /// Helper method allowing rvalues for writing fixups
+  virtual void encodeInstruction(const MCInst &Inst, SmallVectorImpl<char> &CB,
+                                 VectorWriter<MCFixup> &&Fixups,
+                                 const MCSubtargetInfo &STI) const {
+    encodeInstruction(Inst, CB, Fixups, STI);
+  }
 };
 
 } // end namespace llvm

@@ -181,23 +181,20 @@ void MCWasmStreamer::emitInstToFragment(const MCInst &Inst,
 void MCWasmStreamer::emitInstToData(const MCInst &Inst,
                                     const MCSubtargetInfo &STI) {
   MCAssembler &Assembler = getAssembler();
-  SmallVector<MCFixup, 4> Fixups;
-  SmallString<256> Code;
-  Assembler.getEmitter().encodeInstruction(Inst, Code, Fixups, STI);
-
-  for (auto &Fixup : Fixups)
-    fixSymbolsInTLSFixups(Fixup.getValue());
 
   // Append the encoded instruction to the current data fragment (or create a
   // new such fragment if the current fragment is not a data fragment).
   MCDataFragment *DF = getOrCreateDataFragment();
+  size_t FixupStartIdx = DF->getFixups().size();
+  size_t CodeOffset = DF->getContents().size();
+  Assembler.getEmitter().encodeInstruction(
+      Inst, DF->getContents(), DF->getFixupWriter(getContext()), STI);
 
-  // Add the fixups and data.
-  for (unsigned I = 0, E = Fixups.size(); I != E; ++I)
-    Fixups[I].setOffset(Fixups[I].getOffset() + DF->getContents().size());
+  for (auto &Fixup : DF->getFixups().slice(FixupStartIdx)) {
+    fixSymbolsInTLSFixups(Fixup.getValue());
+    Fixup.setOffset(Fixup.getOffset() + CodeOffset);
+  }
   DF->setHasInstructions(STI);
-  DF->getContents().append(Code.begin(), Code.end());
-  DF->getFixupWriter(getContext()).append(Fixups);
 }
 
 void MCWasmStreamer::finishImpl() {

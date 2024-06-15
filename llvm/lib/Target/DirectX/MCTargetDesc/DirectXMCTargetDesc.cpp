@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===- DirectXMCTargetDesc.cpp - DirectX Target Implementation --*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -65,7 +66,7 @@ public:
   DXILMCCodeEmitter() {}
 
   void encodeInstruction(const MCInst &Inst, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override {}
 };
 

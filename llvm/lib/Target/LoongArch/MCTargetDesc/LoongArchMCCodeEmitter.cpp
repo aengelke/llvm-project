@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //=- LoongArchMCCodeEmitter.cpp - Convert LoongArch code to machine code --===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -41,24 +42,24 @@ public:
   ~LoongArchMCCodeEmitter() override {}
 
   void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 
   template <unsigned Opc>
   void expandToVectorLDI(const MCInst &MI, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const;
 
   /// TableGen'erated function for getting the binary encoding for an
   /// instruction.
   uint64_t getBinaryCodeForInstr(const MCInst &MI,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
 
   /// Return binary encoding of operand. If the machine operand requires
   /// relocation, record the relocation and return zero.
   unsigned getMachineOpValue(const MCInst &MI, const MCOperand &MO,
-                             SmallVectorImpl<MCFixup> &Fixups,
+                             VectorWriter<MCFixup> &Fixups,
                              const MCSubtargetInfo &STI) const;
 
   /// Return binary encoding of an immediate operand specified by OpNo.
@@ -66,7 +67,7 @@ public:
   /// Note that this function is dedicated to specific immediate types,
   /// e.g. uimm2_plus1.
   unsigned getImmOpValueSub1(const MCInst &MI, unsigned OpNo,
-                             SmallVectorImpl<MCFixup> &Fixups,
+                             VectorWriter<MCFixup> &Fixups,
                              const MCSubtargetInfo &STI) const;
 
   /// Return binary encoding of an immediate operand specified by OpNo.
@@ -76,7 +77,7 @@ public:
   /// e.g. simm14_lsl2, simm16_lsl2, simm21_lsl2 and simm26_lsl2.
   template <unsigned N>
   unsigned getImmOpValueAsr(const MCInst &MI, unsigned OpNo,
-                            SmallVectorImpl<MCFixup> &Fixups,
+                            VectorWriter<MCFixup> &Fixups,
                             const MCSubtargetInfo &STI) const {
     const MCOperand &MO = MI.getOperand(OpNo);
     if (MO.isImm()) {
@@ -88,14 +89,14 @@ public:
   }
 
   unsigned getExprOpValue(const MCInst &MI, const MCOperand &MO,
-                          SmallVectorImpl<MCFixup> &Fixups,
+                          VectorWriter<MCFixup> &Fixups,
                           const MCSubtargetInfo &STI) const;
 };
 } // end namespace
 
 unsigned
 LoongArchMCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
-                                          SmallVectorImpl<MCFixup> &Fixups,
+                                          VectorWriter<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
 
   if (MO.isReg())
@@ -111,14 +112,14 @@ LoongArchMCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
 
 unsigned
 LoongArchMCCodeEmitter::getImmOpValueSub1(const MCInst &MI, unsigned OpNo,
-                                          SmallVectorImpl<MCFixup> &Fixups,
+                                          VectorWriter<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
   return MI.getOperand(OpNo).getImm() - 1;
 }
 
 unsigned
 LoongArchMCCodeEmitter::getExprOpValue(const MCInst &MI, const MCOperand &MO,
-                                       SmallVectorImpl<MCFixup> &Fixups,
+                                       VectorWriter<MCFixup> &Fixups,
                                        const MCSubtargetInfo &STI) const {
   assert(MO.isExpr() && "getExprOpValue expects only expressions");
   bool RelaxCandidate = false;
@@ -321,8 +322,8 @@ LoongArchMCCodeEmitter::getExprOpValue(const MCInst &MI, const MCOperand &MO,
 
 template <unsigned Opc>
 void LoongArchMCCodeEmitter::expandToVectorLDI(
-    const MCInst &MI, SmallVectorImpl<char> &CB,
-    SmallVectorImpl<MCFixup> &Fixups, const MCSubtargetInfo &STI) const {
+    const MCInst &MI, SmallVectorImpl<char> &CB, VectorWriter<MCFixup> &Fixups,
+    const MCSubtargetInfo &STI) const {
   int64_t Imm = MI.getOperand(1).getImm() & 0x3FF;
   switch (MI.getOpcode()) {
   case LoongArch::PseudoVREPLI_B:
@@ -347,8 +348,8 @@ void LoongArchMCCodeEmitter::expandToVectorLDI(
 }
 
 void LoongArchMCCodeEmitter::encodeInstruction(
-    const MCInst &MI, SmallVectorImpl<char> &CB,
-    SmallVectorImpl<MCFixup> &Fixups, const MCSubtargetInfo &STI) const {
+    const MCInst &MI, SmallVectorImpl<char> &CB, VectorWriter<MCFixup> &Fixups,
+    const MCSubtargetInfo &STI) const {
   const MCInstrDesc &Desc = MCII.get(MI.getOpcode());
   // Get byte count of instruction.
   unsigned Size = Desc.getSize();

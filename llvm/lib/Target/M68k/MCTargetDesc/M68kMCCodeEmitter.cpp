@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===-- M68kMCCodeEmitter.cpp - Convert M68k code emitter -------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -40,27 +41,27 @@ class M68kMCCodeEmitter : public MCCodeEmitter {
   const MCInstrInfo &MCII;
   MCContext &Ctx;
 
-  void getBinaryCodeForInstr(const MCInst &MI, SmallVectorImpl<MCFixup> &Fixups,
+  void getBinaryCodeForInstr(const MCInst &MI, VectorWriter<MCFixup> &Fixups,
                              APInt &Inst, APInt &Scratch,
                              const MCSubtargetInfo &STI) const;
 
   void getMachineOpValue(const MCInst &MI, const MCOperand &Op,
                          unsigned InsertPos, APInt &Value,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const;
 
   template <unsigned Size>
   void encodeRelocImm(const MCInst &MI, unsigned OpIdx, unsigned InsertPos,
-                      APInt &Value, SmallVectorImpl<MCFixup> &Fixups,
+                      APInt &Value, VectorWriter<MCFixup> &Fixups,
                       const MCSubtargetInfo &STI) const;
 
   template <unsigned Size>
   void encodePCRelImm(const MCInst &MI, unsigned OpIdx, unsigned InsertPos,
-                      APInt &Value, SmallVectorImpl<MCFixup> &Fixups,
+                      APInt &Value, VectorWriter<MCFixup> &Fixups,
                       const MCSubtargetInfo &STI) const;
 
   void encodeFPSYSSelect(const MCInst &MI, unsigned OpIdx, unsigned InsertPos,
-                         APInt &Value, SmallVectorImpl<MCFixup> &Fixups,
+                         APInt &Value, VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const;
 
 public:
@@ -70,7 +71,7 @@ public:
   ~M68kMCCodeEmitter() override {}
 
   void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 };
 
@@ -116,7 +117,7 @@ template <unsigned Size> static unsigned getBytePosition(unsigned BitPos) {
 template <unsigned Size>
 void M68kMCCodeEmitter::encodeRelocImm(const MCInst &MI, unsigned OpIdx,
                                        unsigned InsertPos, APInt &Value,
-                                       SmallVectorImpl<MCFixup> &Fixups,
+                                       VectorWriter<MCFixup> &Fixups,
                                        const MCSubtargetInfo &STI) const {
   using value_t = typename select_uint_t<Size>::type;
   const MCOperand &MCO = MI.getOperand(OpIdx);
@@ -143,7 +144,7 @@ void M68kMCCodeEmitter::encodeRelocImm(const MCInst &MI, unsigned OpIdx,
 template <unsigned Size>
 void M68kMCCodeEmitter::encodePCRelImm(const MCInst &MI, unsigned OpIdx,
                                        unsigned InsertPos, APInt &Value,
-                                       SmallVectorImpl<MCFixup> &Fixups,
+                                       VectorWriter<MCFixup> &Fixups,
                                        const MCSubtargetInfo &STI) const {
   const MCOperand &MCO = MI.getOperand(OpIdx);
   if (MCO.isImm()) {
@@ -178,7 +179,7 @@ void M68kMCCodeEmitter::encodePCRelImm(const MCInst &MI, unsigned OpIdx,
 
 void M68kMCCodeEmitter::encodeFPSYSSelect(const MCInst &MI, unsigned OpIdx,
                                           unsigned InsertPos, APInt &Value,
-                                          SmallVectorImpl<MCFixup> &Fixups,
+                                          VectorWriter<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
   MCRegister FPSysReg = MI.getOperand(OpIdx).getReg();
   switch (FPSysReg) {
@@ -198,7 +199,7 @@ void M68kMCCodeEmitter::encodeFPSYSSelect(const MCInst &MI, unsigned OpIdx,
 
 void M68kMCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &Op,
                                           unsigned InsertPos, APInt &Value,
-                                          SmallVectorImpl<MCFixup> &Fixups,
+                                          VectorWriter<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
   // Register
   if (Op.isReg()) {
@@ -225,7 +226,7 @@ void M68kMCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &Op,
 
 void M68kMCCodeEmitter::encodeInstruction(const MCInst &MI,
                                           SmallVectorImpl<char> &CB,
-                                          SmallVectorImpl<MCFixup> &Fixups,
+                                          VectorWriter<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
   LLVM_DEBUG(dbgs() << "EncodeInstruction: " << MCII.getName(MI.getOpcode())
                     << "(" << MI.getOpcode() << ")\n");

@@ -1015,9 +1015,9 @@ bool MCAssembler::relaxInstruction(MCAsmLayout &Layout,
   F.clearFixups();
   F.getContents().clear();
   SmallVector<MCFixup> Fixups;
-  getEmitter().encodeInstruction(Relaxed, F.getContents(), Fixups,
+  getEmitter().encodeInstruction(Relaxed, F.getContents(),
+                                 F.getFixupWriter(getContext()),
                                  *F.getSubtargetInfo());
-  F.getFixupWriter(getContext()).append(Fixups);
   return true;
 }
 

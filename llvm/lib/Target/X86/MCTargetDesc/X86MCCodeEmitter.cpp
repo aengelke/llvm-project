@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===-- X86MCCodeEmitter.cpp - Convert X86 code to machine code -----------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -347,7 +348,7 @@ public:
                   const MCSubtargetInfo &STI) const override;
 
   void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 
 private:
@@ -357,8 +358,8 @@ private:
 
   void emitImmediate(const MCOperand &Disp, SMLoc Loc, unsigned ImmSize,
                      MCFixupKind FixupKind, uint64_t StartByte,
-                     SmallVectorImpl<char> &CB,
-                     SmallVectorImpl<MCFixup> &Fixups, int ImmOffset = 0) const;
+                     SmallVectorImpl<char> &CB, VectorWriter<MCFixup> &Fixups,
+                     int ImmOffset = 0) const;
 
   void emitRegModRMByte(const MCOperand &ModRMReg, unsigned RegOpcodeFld,
                         SmallVectorImpl<char> &CB) const;
@@ -369,7 +370,7 @@ private:
   void emitMemModRMByte(const MCInst &MI, unsigned Op, unsigned RegOpcodeField,
                         uint64_t TSFlags, PrefixKind Kind, uint64_t StartByte,
                         SmallVectorImpl<char> &CB,
-                        SmallVectorImpl<MCFixup> &Fixups,
+                        VectorWriter<MCFixup> &Fixups,
                         const MCSubtargetInfo &STI,
                         bool ForceSIB = false) const;
 
@@ -517,7 +518,7 @@ void X86MCCodeEmitter::emitImmediate(const MCOperand &DispOp, SMLoc Loc,
                                      unsigned Size, MCFixupKind FixupKind,
                                      uint64_t StartByte,
                                      SmallVectorImpl<char> &CB,
-                                     SmallVectorImpl<MCFixup> &Fixups,
+                                     VectorWriter<MCFixup> &Fixups,
                                      int ImmOffset) const {
   const MCExpr *Expr = nullptr;
   if (DispOp.isImm()) {
@@ -607,7 +608,7 @@ void X86MCCodeEmitter::emitSIBByte(unsigned SS, unsigned Index, unsigned Base,
 void X86MCCodeEmitter::emitMemModRMByte(
     const MCInst &MI, unsigned Op, unsigned RegOpcodeField, uint64_t TSFlags,
     PrefixKind Kind, uint64_t StartByte, SmallVectorImpl<char> &CB,
-    SmallVectorImpl<MCFixup> &Fixups, const MCSubtargetInfo &STI,
+    VectorWriter<MCFixup> &Fixups, const MCSubtargetInfo &STI,
     bool ForceSIB) const {
   const MCOperand &Disp = MI.getOperand(Op + X86::AddrDisp);
   const MCOperand &Base = MI.getOperand(Op + X86::AddrBaseReg);
@@ -1533,7 +1534,7 @@ void X86MCCodeEmitter::emitPrefix(const MCInst &MI, SmallVectorImpl<char> &CB,
 
 void X86MCCodeEmitter::encodeInstruction(const MCInst &MI,
                                          SmallVectorImpl<char> &CB,
-                                         SmallVectorImpl<MCFixup> &Fixups,
+                                         VectorWriter<MCFixup> &Fixups,
                                          const MCSubtargetInfo &STI) const {
   unsigned Opcode = MI.getOpcode();
   const MCInstrDesc &Desc = MCII.get(Opcode);

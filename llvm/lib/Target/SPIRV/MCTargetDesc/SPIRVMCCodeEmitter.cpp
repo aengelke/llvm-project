@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===-- SPIRVMCCodeEmitter.cpp - Emit SPIR-V machine code -------*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -40,11 +41,11 @@ public:
   // getBinaryCodeForInstr - TableGen'erated function for getting the
   // binary encoding for an instruction.
   uint64_t getBinaryCodeForInstr(const MCInst &MI,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
 
   void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 };
 
@@ -107,7 +108,7 @@ static void emitUntypedInstrOperands(const MCInst &MI,
 
 void SPIRVMCCodeEmitter::encodeInstruction(const MCInst &MI,
                                            SmallVectorImpl<char> &CB,
-                                           SmallVectorImpl<MCFixup> &Fixups,
+                                           VectorWriter<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
   // Encode the first 32 SPIR-V bytes with the number of args and the opcode.
   const uint64_t OpCode = getBinaryCodeForInstr(MI, Fixups, STI);

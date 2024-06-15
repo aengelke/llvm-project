@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //=- AArch64/AArch64MCCodeEmitter.cpp - Convert AArch64 code to machine code-=//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -53,13 +54,13 @@ public:
   // getBinaryCodeForInstr - TableGen'erated function for getting the
   // binary encoding for an instruction.
   uint64_t getBinaryCodeForInstr(const MCInst &MI,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
 
   /// getMachineOpValue - Return binary encoding of operand. If the machine
   /// operand requires relocation, record the relocation and return zero.
   unsigned getMachineOpValue(const MCInst &MI, const MCOperand &MO,
-                             SmallVectorImpl<MCFixup> &Fixups,
+                             VectorWriter<MCFixup> &Fixups,
                              const MCSubtargetInfo &STI) const;
 
   /// getLdStUImm12OpValue - Return encoding info for 12-bit unsigned immediate
@@ -67,118 +68,118 @@ public:
   /// relocation, record it and return zero in that part of the encoding.
   template <uint32_t FixupKind>
   uint32_t getLdStUImm12OpValue(const MCInst &MI, unsigned OpIdx,
-                                SmallVectorImpl<MCFixup> &Fixups,
+                                VectorWriter<MCFixup> &Fixups,
                                 const MCSubtargetInfo &STI) const;
 
   /// getAdrLabelOpValue - Return encoding info for 21-bit immediate ADR label
   /// target.
   uint32_t getAdrLabelOpValue(const MCInst &MI, unsigned OpIdx,
-                              SmallVectorImpl<MCFixup> &Fixups,
+                              VectorWriter<MCFixup> &Fixups,
                               const MCSubtargetInfo &STI) const;
 
   /// getAddSubImmOpValue - Return encoding for the 12-bit immediate value and
   /// the 2-bit shift field.
   uint32_t getAddSubImmOpValue(const MCInst &MI, unsigned OpIdx,
-                               SmallVectorImpl<MCFixup> &Fixups,
+                               VectorWriter<MCFixup> &Fixups,
                                const MCSubtargetInfo &STI) const;
 
   /// getCondBranchTargetOpValue - Return the encoded value for a conditional
   /// branch target.
   uint32_t getCondBranchTargetOpValue(const MCInst &MI, unsigned OpIdx,
-                                      SmallVectorImpl<MCFixup> &Fixups,
+                                      VectorWriter<MCFixup> &Fixups,
                                       const MCSubtargetInfo &STI) const;
 
   /// getPAuthPCRelOpValue - Return the encoded value for a pointer
   /// authentication pc-relative operand.
   uint32_t getPAuthPCRelOpValue(const MCInst &MI, unsigned OpIdx,
-                                SmallVectorImpl<MCFixup> &Fixups,
+                                VectorWriter<MCFixup> &Fixups,
                                 const MCSubtargetInfo &STI) const;
 
   /// getLoadLiteralOpValue - Return the encoded value for a load-literal
   /// pc-relative address.
   uint32_t getLoadLiteralOpValue(const MCInst &MI, unsigned OpIdx,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
 
   /// getMemExtendOpValue - Return the encoded value for a reg-extend load/store
   /// instruction: bit 0 is whether a shift is present, bit 1 is whether the
   /// operation is a sign extend (as opposed to a zero extend).
   uint32_t getMemExtendOpValue(const MCInst &MI, unsigned OpIdx,
-                               SmallVectorImpl<MCFixup> &Fixups,
+                               VectorWriter<MCFixup> &Fixups,
                                const MCSubtargetInfo &STI) const;
 
   /// getTestBranchTargetOpValue - Return the encoded value for a test-bit-and-
   /// branch target.
   uint32_t getTestBranchTargetOpValue(const MCInst &MI, unsigned OpIdx,
-                                      SmallVectorImpl<MCFixup> &Fixups,
+                                      VectorWriter<MCFixup> &Fixups,
                                       const MCSubtargetInfo &STI) const;
 
   /// getBranchTargetOpValue - Return the encoded value for an unconditional
   /// branch target.
   uint32_t getBranchTargetOpValue(const MCInst &MI, unsigned OpIdx,
-                                  SmallVectorImpl<MCFixup> &Fixups,
+                                  VectorWriter<MCFixup> &Fixups,
                                   const MCSubtargetInfo &STI) const;
 
   /// getMoveWideImmOpValue - Return the encoded value for the immediate operand
   /// of a MOVZ or MOVK instruction.
   uint32_t getMoveWideImmOpValue(const MCInst &MI, unsigned OpIdx,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
 
   /// getVecShifterOpValue - Return the encoded value for the vector shifter.
   uint32_t getVecShifterOpValue(const MCInst &MI, unsigned OpIdx,
-                                SmallVectorImpl<MCFixup> &Fixups,
+                                VectorWriter<MCFixup> &Fixups,
                                 const MCSubtargetInfo &STI) const;
 
   /// getMoveVecShifterOpValue - Return the encoded value for the vector move
   /// shifter (MSL).
   uint32_t getMoveVecShifterOpValue(const MCInst &MI, unsigned OpIdx,
-                                    SmallVectorImpl<MCFixup> &Fixups,
+                                    VectorWriter<MCFixup> &Fixups,
                                     const MCSubtargetInfo &STI) const;
 
   /// getFixedPointScaleOpValue - Return the encoded value for the
   // FP-to-fixed-point scale factor.
   uint32_t getFixedPointScaleOpValue(const MCInst &MI, unsigned OpIdx,
-                                     SmallVectorImpl<MCFixup> &Fixups,
+                                     VectorWriter<MCFixup> &Fixups,
                                      const MCSubtargetInfo &STI) const;
 
   uint32_t getVecShiftR64OpValue(const MCInst &MI, unsigned OpIdx,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
   uint32_t getVecShiftR32OpValue(const MCInst &MI, unsigned OpIdx,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
   uint32_t getVecShiftR16OpValue(const MCInst &MI, unsigned OpIdx,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
   uint32_t getVecShiftR8OpValue(const MCInst &MI, unsigned OpIdx,
-                                SmallVectorImpl<MCFixup> &Fixups,
+                                VectorWriter<MCFixup> &Fixups,
                                 const MCSubtargetInfo &STI) const;
   uint32_t getVecShiftL64OpValue(const MCInst &MI, unsigned OpIdx,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
   uint32_t getVecShiftL32OpValue(const MCInst &MI, unsigned OpIdx,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
   uint32_t getVecShiftL16OpValue(const MCInst &MI, unsigned OpIdx,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
   uint32_t getVecShiftL8OpValue(const MCInst &MI, unsigned OpIdx,
-                                SmallVectorImpl<MCFixup> &Fixups,
+                                VectorWriter<MCFixup> &Fixups,
                                 const MCSubtargetInfo &STI) const;
 
   uint32_t getImm8OptLsl(const MCInst &MI, unsigned OpIdx,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const;
   uint32_t getSVEIncDecImm(const MCInst &MI, unsigned OpIdx,
-                           SmallVectorImpl<MCFixup> &Fixups,
+                           VectorWriter<MCFixup> &Fixups,
                            const MCSubtargetInfo &STI) const;
 
   unsigned fixMOVZ(const MCInst &MI, unsigned EncodedValue,
                    const MCSubtargetInfo &STI) const;
 
   void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 
   unsigned fixMulHigh(const MCInst &MI, unsigned EncodedValue,
@@ -193,25 +194,25 @@ public:
 
   template <unsigned Multiple>
   uint32_t EncodeRegAsMultipleOf(const MCInst &MI, unsigned OpIdx,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  const MCSubtargetInfo &STI) const;
   uint32_t EncodePNR_p8to15(const MCInst &MI, unsigned OpIdx,
-                            SmallVectorImpl<MCFixup> &Fixups,
+                            VectorWriter<MCFixup> &Fixups,
                             const MCSubtargetInfo &STI) const;
 
   uint32_t EncodeZPR2StridedRegisterClass(const MCInst &MI, unsigned OpIdx,
-                                          SmallVectorImpl<MCFixup> &Fixups,
+                                          VectorWriter<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const;
   uint32_t EncodeZPR4StridedRegisterClass(const MCInst &MI, unsigned OpIdx,
-                                          SmallVectorImpl<MCFixup> &Fixups,
+                                          VectorWriter<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const;
 
   uint32_t EncodeMatrixTileListRegisterClass(const MCInst &MI, unsigned OpIdx,
-                                             SmallVectorImpl<MCFixup> &Fixups,
+                                             VectorWriter<MCFixup> &Fixups,
                                              const MCSubtargetInfo &STI) const;
   template <unsigned BaseReg>
   uint32_t encodeMatrixIndexGPR32(const MCInst &MI, unsigned OpIdx,
-                                  SmallVectorImpl<MCFixup> &Fixups,
+                                  VectorWriter<MCFixup> &Fixups,
                                   const MCSubtargetInfo &STI) const;
 };
 
@@ -221,7 +222,7 @@ public:
 /// operand requires relocation, record the relocation and return zero.
 unsigned
 AArch64MCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
-                                        SmallVectorImpl<MCFixup> &Fixups,
+                                        VectorWriter<MCFixup> &Fixups,
                                         const MCSubtargetInfo &STI) const {
   if (MO.isReg())
     return Ctx.getRegisterInfo()->getEncodingValue(MO.getReg());
@@ -230,9 +231,10 @@ AArch64MCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
   return static_cast<unsigned>(MO.getImm());
 }
 
-template<unsigned FixupKind> uint32_t
+template <unsigned FixupKind>
+uint32_t
 AArch64MCCodeEmitter::getLdStUImm12OpValue(const MCInst &MI, unsigned OpIdx,
-                                           SmallVectorImpl<MCFixup> &Fixups,
+                                           VectorWriter<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
   uint32_t ImmVal = 0;
@@ -253,7 +255,7 @@ AArch64MCCodeEmitter::getLdStUImm12OpValue(const MCInst &MI, unsigned OpIdx,
 /// target.
 uint32_t
 AArch64MCCodeEmitter::getAdrLabelOpValue(const MCInst &MI, unsigned OpIdx,
-                                         SmallVectorImpl<MCFixup> &Fixups,
+                                         VectorWriter<MCFixup> &Fixups,
                                          const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
 
@@ -279,7 +281,7 @@ AArch64MCCodeEmitter::getAdrLabelOpValue(const MCInst &MI, unsigned OpIdx,
 /// return value.
 uint32_t
 AArch64MCCodeEmitter::getAddSubImmOpValue(const MCInst &MI, unsigned OpIdx,
-                                          SmallVectorImpl<MCFixup> &Fixups,
+                                          VectorWriter<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
   // Suboperands are [imm, shifter].
   const MCOperand &MO = MI.getOperand(OpIdx);
@@ -315,7 +317,7 @@ AArch64MCCodeEmitter::getAddSubImmOpValue(const MCInst &MI, unsigned OpIdx,
 /// getCondBranchTargetOpValue - Return the encoded value for a conditional
 /// branch target.
 uint32_t AArch64MCCodeEmitter::getCondBranchTargetOpValue(
-    const MCInst &MI, unsigned OpIdx, SmallVectorImpl<MCFixup> &Fixups,
+    const MCInst &MI, unsigned OpIdx, VectorWriter<MCFixup> &Fixups,
     const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
 
@@ -337,7 +339,7 @@ uint32_t AArch64MCCodeEmitter::getCondBranchTargetOpValue(
 /// authentication pc-relative operand.
 uint32_t
 AArch64MCCodeEmitter::getPAuthPCRelOpValue(const MCInst &MI, unsigned OpIdx,
-                                           SmallVectorImpl<MCFixup> &Fixups,
+                                           VectorWriter<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
 
@@ -360,7 +362,7 @@ AArch64MCCodeEmitter::getPAuthPCRelOpValue(const MCInst &MI, unsigned OpIdx,
 /// pc-relative address.
 uint32_t
 AArch64MCCodeEmitter::getLoadLiteralOpValue(const MCInst &MI, unsigned OpIdx,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
 
@@ -380,7 +382,7 @@ AArch64MCCodeEmitter::getLoadLiteralOpValue(const MCInst &MI, unsigned OpIdx,
 
 uint32_t
 AArch64MCCodeEmitter::getMemExtendOpValue(const MCInst &MI, unsigned OpIdx,
-                                          SmallVectorImpl<MCFixup> &Fixups,
+                                          VectorWriter<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
   unsigned SignExtend = MI.getOperand(OpIdx).getImm();
   unsigned DoShift = MI.getOperand(OpIdx + 1).getImm();
@@ -389,7 +391,7 @@ AArch64MCCodeEmitter::getMemExtendOpValue(const MCInst &MI, unsigned OpIdx,
 
 uint32_t
 AArch64MCCodeEmitter::getMoveWideImmOpValue(const MCInst &MI, unsigned OpIdx,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
 
@@ -408,7 +410,7 @@ AArch64MCCodeEmitter::getMoveWideImmOpValue(const MCInst &MI, unsigned OpIdx,
 /// getTestBranchTargetOpValue - Return the encoded value for a test-bit-and-
 /// branch target.
 uint32_t AArch64MCCodeEmitter::getTestBranchTargetOpValue(
-    const MCInst &MI, unsigned OpIdx, SmallVectorImpl<MCFixup> &Fixups,
+    const MCInst &MI, unsigned OpIdx, VectorWriter<MCFixup> &Fixups,
     const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
 
@@ -430,7 +432,7 @@ uint32_t AArch64MCCodeEmitter::getTestBranchTargetOpValue(
 /// branch target.
 uint32_t
 AArch64MCCodeEmitter::getBranchTargetOpValue(const MCInst &MI, unsigned OpIdx,
-                                             SmallVectorImpl<MCFixup> &Fixups,
+                                             VectorWriter<MCFixup> &Fixups,
                                              const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
 
@@ -458,7 +460,7 @@ AArch64MCCodeEmitter::getBranchTargetOpValue(const MCInst &MI, unsigned OpIdx,
 ///   11 -> 24
 uint32_t
 AArch64MCCodeEmitter::getVecShifterOpValue(const MCInst &MI, unsigned OpIdx,
-                                           SmallVectorImpl<MCFixup> &Fixups,
+                                           VectorWriter<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
   assert(MO.isImm() && "Expected an immediate value for the shift amount!");
@@ -482,7 +484,7 @@ AArch64MCCodeEmitter::getVecShifterOpValue(const MCInst &MI, unsigned OpIdx,
 /// getFixedPointScaleOpValue - Return the encoded value for the
 // FP-to-fixed-point scale factor.
 uint32_t AArch64MCCodeEmitter::getFixedPointScaleOpValue(
-    const MCInst &MI, unsigned OpIdx, SmallVectorImpl<MCFixup> &Fixups,
+    const MCInst &MI, unsigned OpIdx, VectorWriter<MCFixup> &Fixups,
     const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
   assert(MO.isImm() && "Expected an immediate value for the scale amount!");
@@ -491,7 +493,7 @@ uint32_t AArch64MCCodeEmitter::getFixedPointScaleOpValue(
 
 uint32_t
 AArch64MCCodeEmitter::getVecShiftR64OpValue(const MCInst &MI, unsigned OpIdx,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
   assert(MO.isImm() && "Expected an immediate value for the scale amount!");
@@ -500,7 +502,7 @@ AArch64MCCodeEmitter::getVecShiftR64OpValue(const MCInst &MI, unsigned OpIdx,
 
 uint32_t
 AArch64MCCodeEmitter::getVecShiftR32OpValue(const MCInst &MI, unsigned OpIdx,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
   assert(MO.isImm() && "Expected an immediate value for the scale amount!");
@@ -509,7 +511,7 @@ AArch64MCCodeEmitter::getVecShiftR32OpValue(const MCInst &MI, unsigned OpIdx,
 
 uint32_t
 AArch64MCCodeEmitter::getVecShiftR16OpValue(const MCInst &MI, unsigned OpIdx,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
   assert(MO.isImm() && "Expected an immediate value for the scale amount!");
@@ -518,7 +520,7 @@ AArch64MCCodeEmitter::getVecShiftR16OpValue(const MCInst &MI, unsigned OpIdx,
 
 uint32_t
 AArch64MCCodeEmitter::getVecShiftR8OpValue(const MCInst &MI, unsigned OpIdx,
-                                           SmallVectorImpl<MCFixup> &Fixups,
+                                           VectorWriter<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
   assert(MO.isImm() && "Expected an immediate value for the scale amount!");
@@ -527,7 +529,7 @@ AArch64MCCodeEmitter::getVecShiftR8OpValue(const MCInst &MI, unsigned OpIdx,
 
 uint32_t
 AArch64MCCodeEmitter::getVecShiftL64OpValue(const MCInst &MI, unsigned OpIdx,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
   assert(MO.isImm() && "Expected an immediate value for the scale amount!");
@@ -536,7 +538,7 @@ AArch64MCCodeEmitter::getVecShiftL64OpValue(const MCInst &MI, unsigned OpIdx,
 
 uint32_t
 AArch64MCCodeEmitter::getVecShiftL32OpValue(const MCInst &MI, unsigned OpIdx,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
   assert(MO.isImm() && "Expected an immediate value for the scale amount!");
@@ -545,7 +547,7 @@ AArch64MCCodeEmitter::getVecShiftL32OpValue(const MCInst &MI, unsigned OpIdx,
 
 uint32_t
 AArch64MCCodeEmitter::getVecShiftL16OpValue(const MCInst &MI, unsigned OpIdx,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
   assert(MO.isImm() && "Expected an immediate value for the scale amount!");
@@ -554,7 +556,7 @@ AArch64MCCodeEmitter::getVecShiftL16OpValue(const MCInst &MI, unsigned OpIdx,
 
 uint32_t
 AArch64MCCodeEmitter::getVecShiftL8OpValue(const MCInst &MI, unsigned OpIdx,
-                                           SmallVectorImpl<MCFixup> &Fixups,
+                                           VectorWriter<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
   assert(MO.isImm() && "Expected an immediate value for the scale amount!");
@@ -564,7 +566,7 @@ AArch64MCCodeEmitter::getVecShiftL8OpValue(const MCInst &MI, unsigned OpIdx,
 template <unsigned Multiple>
 uint32_t
 AArch64MCCodeEmitter::EncodeRegAsMultipleOf(const MCInst &MI, unsigned OpIdx,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
   assert(llvm::isPowerOf2_32(Multiple) && "Multiple is not a power of 2");
   auto RegOpnd = MI.getOperand(OpIdx).getReg();
@@ -574,14 +576,14 @@ AArch64MCCodeEmitter::EncodeRegAsMultipleOf(const MCInst &MI, unsigned OpIdx,
 
 uint32_t
 AArch64MCCodeEmitter::EncodePNR_p8to15(const MCInst &MI, unsigned OpIdx,
-                                       SmallVectorImpl<MCFixup> &Fixups,
+                                       VectorWriter<MCFixup> &Fixups,
                                        const MCSubtargetInfo &STI) const {
   auto RegOpnd = MI.getOperand(OpIdx).getReg();
   return RegOpnd - AArch64::PN8;
 }
 
 uint32_t AArch64MCCodeEmitter::EncodeZPR2StridedRegisterClass(
-    const MCInst &MI, unsigned OpIdx, SmallVectorImpl<MCFixup> &Fixups,
+    const MCInst &MI, unsigned OpIdx, VectorWriter<MCFixup> &Fixups,
     const MCSubtargetInfo &STI) const {
   auto RegOpnd = MI.getOperand(OpIdx).getReg();
   unsigned RegVal = Ctx.getRegisterInfo()->getEncodingValue(RegOpnd);
@@ -591,7 +593,7 @@ uint32_t AArch64MCCodeEmitter::EncodeZPR2StridedRegisterClass(
 }
 
 uint32_t AArch64MCCodeEmitter::EncodeZPR4StridedRegisterClass(
-    const MCInst &MI, unsigned OpIdx, SmallVectorImpl<MCFixup> &Fixups,
+    const MCInst &MI, unsigned OpIdx, VectorWriter<MCFixup> &Fixups,
     const MCSubtargetInfo &STI) const {
   auto RegOpnd = MI.getOperand(OpIdx).getReg();
   unsigned RegVal = Ctx.getRegisterInfo()->getEncodingValue(RegOpnd);
@@ -601,7 +603,7 @@ uint32_t AArch64MCCodeEmitter::EncodeZPR4StridedRegisterClass(
 }
 
 uint32_t AArch64MCCodeEmitter::EncodeMatrixTileListRegisterClass(
-    const MCInst &MI, unsigned OpIdx, SmallVectorImpl<MCFixup> &Fixups,
+    const MCInst &MI, unsigned OpIdx, VectorWriter<MCFixup> &Fixups,
     const MCSubtargetInfo &STI) const {
   unsigned RegMask = MI.getOperand(OpIdx).getImm();
   assert(RegMask <= 0xFF && "Invalid register mask!");
@@ -611,16 +613,15 @@ uint32_t AArch64MCCodeEmitter::EncodeMatrixTileListRegisterClass(
 template <unsigned BaseReg>
 uint32_t
 AArch64MCCodeEmitter::encodeMatrixIndexGPR32(const MCInst &MI, unsigned OpIdx,
-                                             SmallVectorImpl<MCFixup> &Fixups,
+                                             VectorWriter<MCFixup> &Fixups,
                                              const MCSubtargetInfo &STI) const {
   auto RegOpnd = MI.getOperand(OpIdx).getReg();
   return RegOpnd - BaseReg;
 }
 
-uint32_t
-AArch64MCCodeEmitter::getImm8OptLsl(const MCInst &MI, unsigned OpIdx,
-                                    SmallVectorImpl<MCFixup> &Fixups,
-                                    const MCSubtargetInfo &STI) const {
+uint32_t AArch64MCCodeEmitter::getImm8OptLsl(const MCInst &MI, unsigned OpIdx,
+                                             VectorWriter<MCFixup> &Fixups,
+                                             const MCSubtargetInfo &STI) const {
   // Test shift
   auto ShiftOpnd = MI.getOperand(OpIdx + 1).getImm();
   assert(AArch64_AM::getShiftType(ShiftOpnd) == AArch64_AM::LSL &&
@@ -637,8 +638,8 @@ AArch64MCCodeEmitter::getImm8OptLsl(const MCInst &MI, unsigned OpIdx,
 
 uint32_t
 AArch64MCCodeEmitter::getSVEIncDecImm(const MCInst &MI, unsigned OpIdx,
-                                           SmallVectorImpl<MCFixup> &Fixups,
-                                           const MCSubtargetInfo &STI) const {
+                                      VectorWriter<MCFixup> &Fixups,
+                                      const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
   assert(MO.isImm() && "Expected an immediate value!");
   // Normalize 1-16 range to 0-15.
@@ -648,7 +649,7 @@ AArch64MCCodeEmitter::getSVEIncDecImm(const MCInst &MI, unsigned OpIdx,
 /// getMoveVecShifterOpValue - Return the encoded value for the vector move
 /// shifter (MSL).
 uint32_t AArch64MCCodeEmitter::getMoveVecShifterOpValue(
-    const MCInst &MI, unsigned OpIdx, SmallVectorImpl<MCFixup> &Fixups,
+    const MCInst &MI, unsigned OpIdx, VectorWriter<MCFixup> &Fixups,
     const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpIdx);
   assert(MO.isImm() &&
@@ -693,7 +694,7 @@ unsigned AArch64MCCodeEmitter::fixMOVZ(const MCInst &MI, unsigned EncodedValue,
 void AArch64MCCodeEmitter::encodeInstruction(const MCInst &MI,
                                              SmallVectorImpl<char> &CB,
 
-                                             SmallVectorImpl<MCFixup> &Fixups,
+                                             VectorWriter<MCFixup> &Fixups,
                                              const MCSubtargetInfo &STI) const {
   if (MI.getOpcode() == AArch64::TLSDESCCALL) {
     // This is a directive which applies an R_AARCH64_TLSDESC_CALL to the

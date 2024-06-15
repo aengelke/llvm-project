@@ -285,11 +285,12 @@ void AMDGPUAsmPrinter::emitInstruction(const MachineInstr *MI) {
     if (!MI->isPseudo() && STI.isCPUStringValid(STI.getCPU()) &&
         (!STI.hasOffset3fBug() || !MI->isBranch())) {
       SmallVector<MCFixup, 4> Fixups;
+      VectorWriter<MCFixup> FixupWriter(Fixups);
       SmallVector<char, 16> CodeBytes;
 
       std::unique_ptr<MCCodeEmitter> InstEmitter(createAMDGPUMCCodeEmitter(
           *STI.getInstrInfo(), OutContext));
-      InstEmitter->encodeInstruction(TmpInst, CodeBytes, Fixups, STI);
+      InstEmitter->encodeInstruction(TmpInst, CodeBytes, FixupWriter, STI);
 
       assert(CodeBytes.size() == STI.getInstrInfo()->getInstSizeInBytes(*MI));
     }
@@ -307,10 +308,11 @@ void AMDGPUAsmPrinter::emitInstruction(const MachineInstr *MI) {
 
       // Disassemble instruction/operands to hex representation.
       SmallVector<MCFixup, 4> Fixups;
+      VectorWriter<MCFixup> FixupWriter(Fixups);
       SmallVector<char, 16> CodeBytes;
 
       DumpCodeInstEmitter->encodeInstruction(
-          TmpInst, CodeBytes, Fixups, MF->getSubtarget<MCSubtargetInfo>());
+          TmpInst, CodeBytes, FixupWriter, MF->getSubtarget<MCSubtargetInfo>());
       HexLines.resize(HexLines.size() + 1);
       std::string &HexLine = HexLines.back();
       raw_string_ostream HexStream(HexLine);

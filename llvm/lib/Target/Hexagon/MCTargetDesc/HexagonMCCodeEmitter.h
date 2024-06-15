@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===- HexagonMCCodeEmitter.h - Hexagon Target Descriptions -----*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -50,29 +51,29 @@ public:
     : MCT(MCT), MCII(MII) {}
 
   void encodeInstruction(MCInst const &MI, SmallVectorImpl<char> &CB,
-                         SmallVectorImpl<MCFixup> &Fixups,
+                         VectorWriter<MCFixup> &Fixups,
                          MCSubtargetInfo const &STI) const override;
 
   void encodeSingleInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
-                               SmallVectorImpl<MCFixup> &Fixups,
+                               VectorWriter<MCFixup> &Fixups,
                                const MCSubtargetInfo &STI,
                                uint32_t Parse) const;
 
   // TableGen'erated function for getting the
   // binary encoding for an instruction.
   uint64_t getBinaryCodeForInstr(MCInst const &MI,
-                                 SmallVectorImpl<MCFixup> &Fixups,
+                                 VectorWriter<MCFixup> &Fixups,
                                  MCSubtargetInfo const &STI) const;
 
   /// Return binary encoding of operand.
   unsigned getMachineOpValue(MCInst const &MI, MCOperand const &MO,
-                             SmallVectorImpl<MCFixup> &Fixups,
+                             VectorWriter<MCFixup> &Fixups,
                              MCSubtargetInfo const &STI) const;
 
 private:
   // helper routine for getMachineOpValue()
   unsigned getExprOpValue(const MCInst &MI, const MCOperand &MO,
-                          const MCExpr *ME, SmallVectorImpl<MCFixup> &Fixups,
+                          const MCExpr *ME, VectorWriter<MCFixup> &Fixups,
                           const MCSubtargetInfo &STI) const;
 
   Hexagon::Fixups getFixupNoBits(MCInstrInfo const &MCII, const MCInst &MI,

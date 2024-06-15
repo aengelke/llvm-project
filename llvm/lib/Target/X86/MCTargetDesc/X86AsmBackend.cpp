@@ -846,6 +846,7 @@ bool X86AsmBackend::padInstructionViaRelaxation(MCRelaxableFragment &RF,
   RF.setInst(Relaxed);
   RF.getContents() = Code;
   RF.clearFixups();
+  // TODO: Remove copy of fixups
   RF.getFixupWriter(Ctx).append(Fixups);
   RemainingSize -= Delta;
   return true;

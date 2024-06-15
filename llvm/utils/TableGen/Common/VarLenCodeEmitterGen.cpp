@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===- VarLenCodeEmitterGen.cpp - CEG for variable-length insts -----------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -260,7 +261,7 @@ void VarLenCodeEmitterGen::run(raw_ostream &OS) {
   // Emit function declaration
   OS << "void " << Target.getName()
      << "MCCodeEmitter::getBinaryCodeForInstr(const MCInst &MI,\n"
-     << "    SmallVectorImpl<MCFixup> &Fixups,\n"
+     << "    VectorWriter<MCFixup> &Fixups,\n"
      << "    APInt &Inst,\n"
      << "    APInt &Scratch,\n"
      << "    const MCSubtargetInfo &STI) const {\n";

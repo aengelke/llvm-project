@@ -9,6 +9,7 @@
 #ifndef LLVM_ADT_SLABVECTORSTORAGE_H
 #define LLVM_ADT_SLABVECTORSTORAGE_H
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include <memory>
@@ -164,6 +165,8 @@ public:
     memcpy(reinterpret_cast<void *>(Cur), &Elt, sizeof(T));
     Cur++;
   }
+
+  void pop_back() { Cur--; }
 
   void append(ArrayRef<T> Elts) {
     if (Elts.empty())

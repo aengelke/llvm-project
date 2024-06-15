@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===-- CSKYMCCodeEmitter.cpp - CSKY Code Emitter interface ---------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -28,7 +29,7 @@ using namespace llvm;
 STATISTIC(MCNumEmitted, "Number of MC instructions emitted");
 
 unsigned CSKYMCCodeEmitter::getOImmOpValue(const MCInst &MI, unsigned Idx,
-                                           SmallVectorImpl<MCFixup> &Fixups,
+                                           VectorWriter<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(Idx);
   assert(MO.isImm() && "Unexpected MO type.");
@@ -37,7 +38,7 @@ unsigned CSKYMCCodeEmitter::getOImmOpValue(const MCInst &MI, unsigned Idx,
 
 unsigned
 CSKYMCCodeEmitter::getImmOpValueIDLY(const MCInst &MI, unsigned Idx,
-                                     SmallVectorImpl<MCFixup> &Fixups,
+                                     VectorWriter<MCFixup> &Fixups,
                                      const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(Idx);
   assert(MO.isImm() && "Unexpected MO type.");
@@ -48,7 +49,7 @@ CSKYMCCodeEmitter::getImmOpValueIDLY(const MCInst &MI, unsigned Idx,
 
 unsigned
 CSKYMCCodeEmitter::getImmOpValueMSBSize(const MCInst &MI, unsigned Idx,
-                                        SmallVectorImpl<MCFixup> &Fixups,
+                                        VectorWriter<MCFixup> &Fixups,
                                         const MCSubtargetInfo &STI) const {
   const MCOperand &MSB = MI.getOperand(Idx);
   const MCOperand &LSB = MI.getOperand(Idx + 1);
@@ -66,7 +67,7 @@ static void writeData(uint32_t Bin, unsigned Size, SmallVectorImpl<char> &CB) {
 }
 
 void CSKYMCCodeEmitter::expandJBTF(const MCInst &MI, SmallVectorImpl<char> &CB,
-                                   SmallVectorImpl<MCFixup> &Fixups,
+                                   VectorWriter<MCFixup> &Fixups,
                                    const MCSubtargetInfo &STI) const {
 
   MCInst TmpInst;
@@ -92,7 +93,7 @@ void CSKYMCCodeEmitter::expandJBTF(const MCInst &MI, SmallVectorImpl<char> &CB,
 }
 
 void CSKYMCCodeEmitter::expandNEG(const MCInst &MI, SmallVectorImpl<char> &CB,
-                                  SmallVectorImpl<MCFixup> &Fixups,
+                                  VectorWriter<MCFixup> &Fixups,
                                   const MCSubtargetInfo &STI) const {
 
   MCInst TmpInst;
@@ -114,7 +115,7 @@ void CSKYMCCodeEmitter::expandNEG(const MCInst &MI, SmallVectorImpl<char> &CB,
 }
 
 void CSKYMCCodeEmitter::expandRSUBI(const MCInst &MI, SmallVectorImpl<char> &CB,
-                                    SmallVectorImpl<MCFixup> &Fixups,
+                                    VectorWriter<MCFixup> &Fixups,
                                     const MCSubtargetInfo &STI) const {
 
   MCInst TmpInst;
@@ -137,7 +138,7 @@ void CSKYMCCodeEmitter::expandRSUBI(const MCInst &MI, SmallVectorImpl<char> &CB,
 
 void CSKYMCCodeEmitter::encodeInstruction(const MCInst &MI,
                                           SmallVectorImpl<char> &CB,
-                                          SmallVectorImpl<MCFixup> &Fixups,
+                                          VectorWriter<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
   const MCInstrDesc &Desc = MII.get(MI.getOpcode());
   unsigned Size = Desc.getSize();
@@ -233,7 +234,7 @@ void CSKYMCCodeEmitter::encodeInstruction(const MCInst &MI,
 
 unsigned
 CSKYMCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
-                                     SmallVectorImpl<MCFixup> &Fixups,
+                                     VectorWriter<MCFixup> &Fixups,
                                      const MCSubtargetInfo &STI) const {
   if (MO.isReg())
     return Ctx.getRegisterInfo()->getEncodingValue(MO.getReg());
@@ -247,7 +248,7 @@ CSKYMCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
 
 unsigned
 CSKYMCCodeEmitter::getRegSeqImmOpValue(const MCInst &MI, unsigned Idx,
-                                       SmallVectorImpl<MCFixup> &Fixups,
+                                       VectorWriter<MCFixup> &Fixups,
                                        const MCSubtargetInfo &STI) const {
   assert(MI.getOperand(Idx).isReg() && "Unexpected MO type.");
   assert(MI.getOperand(Idx + 1).isImm() && "Unexpected MO type.");
@@ -263,7 +264,7 @@ CSKYMCCodeEmitter::getRegSeqImmOpValue(const MCInst &MI, unsigned Idx,
 
 unsigned
 CSKYMCCodeEmitter::getRegisterSeqOpValue(const MCInst &MI, unsigned Op,
-                                         SmallVectorImpl<MCFixup> &Fixups,
+                                         VectorWriter<MCFixup> &Fixups,
                                          const MCSubtargetInfo &STI) const {
   unsigned Reg1 =
       Ctx.getRegisterInfo()->getEncodingValue(MI.getOperand(Op).getReg());
@@ -276,7 +277,7 @@ CSKYMCCodeEmitter::getRegisterSeqOpValue(const MCInst &MI, unsigned Op,
 }
 
 unsigned CSKYMCCodeEmitter::getImmJMPIX(const MCInst &MI, unsigned Idx,
-                                        SmallVectorImpl<MCFixup> &Fixups,
+                                        VectorWriter<MCFixup> &Fixups,
                                         const MCSubtargetInfo &STI) const {
   if (MI.getOperand(Idx).getImm() == 16)
     return 0;

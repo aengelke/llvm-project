@@ -1,3 +1,4 @@
+#include "llvm/ADT/SlabVectorStorage.h"
 //===-- PPCMCCodeEmitter.cpp - Convert PPC code to machine code -----------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
@@ -40,10 +41,10 @@ MCCodeEmitter *llvm::createPPCMCCodeEmitter(const MCInstrInfo &MCII,
   return new PPCMCCodeEmitter(MCII, Ctx);
 }
 
-unsigned PPCMCCodeEmitter::
-getDirectBrEncoding(const MCInst &MI, unsigned OpNo,
-                    SmallVectorImpl<MCFixup> &Fixups,
-                    const MCSubtargetInfo &STI) const {
+unsigned
+PPCMCCodeEmitter::getDirectBrEncoding(const MCInst &MI, unsigned OpNo,
+                                      VectorWriter<MCFixup> &Fixups,
+                                      const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
 
   if (MO.isReg() || MO.isImm())
@@ -152,8 +153,8 @@ bool PPCMCCodeEmitter::isNoTOCCallInstr(const MCInst &MI) const {
 }
 
 unsigned PPCMCCodeEmitter::getCondBrEncoding(const MCInst &MI, unsigned OpNo,
-                                     SmallVectorImpl<MCFixup> &Fixups,
-                                     const MCSubtargetInfo &STI) const {
+                                             VectorWriter<MCFixup> &Fixups,
+                                             const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isReg() || MO.isImm()) return getMachineOpValue(MI, MO, Fixups, STI);
 
@@ -163,10 +164,10 @@ unsigned PPCMCCodeEmitter::getCondBrEncoding(const MCInst &MI, unsigned OpNo,
   return 0;
 }
 
-unsigned PPCMCCodeEmitter::
-getAbsDirectBrEncoding(const MCInst &MI, unsigned OpNo,
-                       SmallVectorImpl<MCFixup> &Fixups,
-                       const MCSubtargetInfo &STI) const {
+unsigned
+PPCMCCodeEmitter::getAbsDirectBrEncoding(const MCInst &MI, unsigned OpNo,
+                                         VectorWriter<MCFixup> &Fixups,
+                                         const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isReg() || MO.isImm()) return getMachineOpValue(MI, MO, Fixups, STI);
 
@@ -176,10 +177,10 @@ getAbsDirectBrEncoding(const MCInst &MI, unsigned OpNo,
   return 0;
 }
 
-unsigned PPCMCCodeEmitter::
-getAbsCondBrEncoding(const MCInst &MI, unsigned OpNo,
-                     SmallVectorImpl<MCFixup> &Fixups,
-                     const MCSubtargetInfo &STI) const {
+unsigned
+PPCMCCodeEmitter::getAbsCondBrEncoding(const MCInst &MI, unsigned OpNo,
+                                       VectorWriter<MCFixup> &Fixups,
+                                       const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isReg() || MO.isImm()) return getMachineOpValue(MI, MO, Fixups, STI);
 
@@ -191,7 +192,7 @@ getAbsCondBrEncoding(const MCInst &MI, unsigned OpNo,
 
 unsigned
 PPCMCCodeEmitter::getVSRpEvenEncoding(const MCInst &MI, unsigned OpNo,
-                                      SmallVectorImpl<MCFixup> &Fixups,
+                                      VectorWriter<MCFixup> &Fixups,
                                       const MCSubtargetInfo &STI) const {
   assert(MI.getOperand(OpNo).isReg() && "Operand should be a register");
   unsigned RegBits = getMachineOpValue(MI, MI.getOperand(OpNo), Fixups, STI)
@@ -200,8 +201,8 @@ PPCMCCodeEmitter::getVSRpEvenEncoding(const MCInst &MI, unsigned OpNo,
 }
 
 unsigned PPCMCCodeEmitter::getImm16Encoding(const MCInst &MI, unsigned OpNo,
-                                       SmallVectorImpl<MCFixup> &Fixups,
-                                       const MCSubtargetInfo &STI) const {
+                                            VectorWriter<MCFixup> &Fixups,
+                                            const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isReg() || MO.isImm()) return getMachineOpValue(MI, MO, Fixups, STI);
 
@@ -212,7 +213,7 @@ unsigned PPCMCCodeEmitter::getImm16Encoding(const MCInst &MI, unsigned OpNo,
 }
 
 uint64_t PPCMCCodeEmitter::getImm34Encoding(const MCInst &MI, unsigned OpNo,
-                                            SmallVectorImpl<MCFixup> &Fixups,
+                                            VectorWriter<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI,
                                             MCFixupKind Fixup) const {
   const MCOperand &MO = MI.getOperand(OpNo);
@@ -227,7 +228,7 @@ uint64_t PPCMCCodeEmitter::getImm34Encoding(const MCInst &MI, unsigned OpNo,
 
 uint64_t
 PPCMCCodeEmitter::getImm34EncodingNoPCRel(const MCInst &MI, unsigned OpNo,
-                                          SmallVectorImpl<MCFixup> &Fixups,
+                                          VectorWriter<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
   return getImm34Encoding(MI, OpNo, Fixups, STI,
                           (MCFixupKind)PPC::fixup_ppc_imm34);
@@ -235,14 +236,14 @@ PPCMCCodeEmitter::getImm34EncodingNoPCRel(const MCInst &MI, unsigned OpNo,
 
 uint64_t
 PPCMCCodeEmitter::getImm34EncodingPCRel(const MCInst &MI, unsigned OpNo,
-                                        SmallVectorImpl<MCFixup> &Fixups,
+                                        VectorWriter<MCFixup> &Fixups,
                                         const MCSubtargetInfo &STI) const {
   return getImm34Encoding(MI, OpNo, Fixups, STI,
                           (MCFixupKind)PPC::fixup_ppc_pcrel34);
 }
 
 unsigned PPCMCCodeEmitter::getDispRIEncoding(const MCInst &MI, unsigned OpNo,
-                                             SmallVectorImpl<MCFixup> &Fixups,
+                                             VectorWriter<MCFixup> &Fixups,
                                              const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isImm())
@@ -256,7 +257,7 @@ unsigned PPCMCCodeEmitter::getDispRIEncoding(const MCInst &MI, unsigned OpNo,
 
 unsigned
 PPCMCCodeEmitter::getDispRIXEncoding(const MCInst &MI, unsigned OpNo,
-                                     SmallVectorImpl<MCFixup> &Fixups,
+                                     VectorWriter<MCFixup> &Fixups,
                                      const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isImm())
@@ -270,7 +271,7 @@ PPCMCCodeEmitter::getDispRIXEncoding(const MCInst &MI, unsigned OpNo,
 
 unsigned
 PPCMCCodeEmitter::getDispRIX16Encoding(const MCInst &MI, unsigned OpNo,
-                                       SmallVectorImpl<MCFixup> &Fixups,
+                                       VectorWriter<MCFixup> &Fixups,
                                        const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isImm()) {
@@ -287,7 +288,7 @@ PPCMCCodeEmitter::getDispRIX16Encoding(const MCInst &MI, unsigned OpNo,
 
 unsigned
 PPCMCCodeEmitter::getDispRIHashEncoding(const MCInst &MI, unsigned OpNo,
-                                        SmallVectorImpl<MCFixup> &Fixups,
+                                        VectorWriter<MCFixup> &Fixups,
                                         const MCSubtargetInfo &STI) const {
   // Encode imm for the hash load/store to stack for the ROP Protection
   // instructions.
@@ -302,7 +303,7 @@ PPCMCCodeEmitter::getDispRIHashEncoding(const MCInst &MI, unsigned OpNo,
 
 uint64_t
 PPCMCCodeEmitter::getDispRI34PCRelEncoding(const MCInst &MI, unsigned OpNo,
-                                           SmallVectorImpl<MCFixup> &Fixups,
+                                           VectorWriter<MCFixup> &Fixups,
                                            const MCSubtargetInfo &STI) const {
   // Encode the displacement part of pc-relative memri34, which is an imm34.
   // The 34 bit immediate can fall into one of three cases:
@@ -385,7 +386,7 @@ PPCMCCodeEmitter::getDispRI34PCRelEncoding(const MCInst &MI, unsigned OpNo,
 
 uint64_t
 PPCMCCodeEmitter::getDispRI34Encoding(const MCInst &MI, unsigned OpNo,
-                                      SmallVectorImpl<MCFixup> &Fixups,
+                                      VectorWriter<MCFixup> &Fixups,
                                       const MCSubtargetInfo &STI) const {
   // Encode the displacement part of a memri34.
   const MCOperand &MO = MI.getOperand(OpNo);
@@ -394,7 +395,7 @@ PPCMCCodeEmitter::getDispRI34Encoding(const MCInst &MI, unsigned OpNo,
 
 unsigned
 PPCMCCodeEmitter::getDispSPE8Encoding(const MCInst &MI, unsigned OpNo,
-                                      SmallVectorImpl<MCFixup> &Fixups,
+                                      VectorWriter<MCFixup> &Fixups,
                                       const MCSubtargetInfo &STI) const {
   // Encode imm as a dispSPE8, which has the low 5-bits of (imm / 8).
   const MCOperand &MO = MI.getOperand(OpNo);
@@ -404,7 +405,7 @@ PPCMCCodeEmitter::getDispSPE8Encoding(const MCInst &MI, unsigned OpNo,
 
 unsigned
 PPCMCCodeEmitter::getDispSPE4Encoding(const MCInst &MI, unsigned OpNo,
-                                      SmallVectorImpl<MCFixup> &Fixups,
+                                      VectorWriter<MCFixup> &Fixups,
                                       const MCSubtargetInfo &STI) const {
   // Encode imm as a dispSPE8, which has the low 5-bits of (imm / 4).
   const MCOperand &MO = MI.getOperand(OpNo);
@@ -414,7 +415,7 @@ PPCMCCodeEmitter::getDispSPE4Encoding(const MCInst &MI, unsigned OpNo,
 
 unsigned
 PPCMCCodeEmitter::getDispSPE2Encoding(const MCInst &MI, unsigned OpNo,
-                                      SmallVectorImpl<MCFixup> &Fixups,
+                                      VectorWriter<MCFixup> &Fixups,
                                       const MCSubtargetInfo &STI) const {
   // Encode imm as a dispSPE8, which has the low 5-bits of (imm / 2).
   const MCOperand &MO = MI.getOperand(OpNo);
@@ -423,8 +424,8 @@ PPCMCCodeEmitter::getDispSPE2Encoding(const MCInst &MI, unsigned OpNo,
 }
 
 unsigned PPCMCCodeEmitter::getTLSRegEncoding(const MCInst &MI, unsigned OpNo,
-                                       SmallVectorImpl<MCFixup> &Fixups,
-                                       const MCSubtargetInfo &STI) const {
+                                             VectorWriter<MCFixup> &Fixups,
+                                             const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   if (MO.isReg()) return getMachineOpValue(MI, MO, Fixups, STI);
 
@@ -442,9 +443,10 @@ unsigned PPCMCCodeEmitter::getTLSRegEncoding(const MCInst &MI, unsigned OpNo,
   return CTX.getRegisterInfo()->getEncodingValue(isPPC64 ? PPC::X13 : PPC::R2);
 }
 
-unsigned PPCMCCodeEmitter::getTLSCallEncoding(const MCInst &MI, unsigned OpNo,
-                                       SmallVectorImpl<MCFixup> &Fixups,
-                                       const MCSubtargetInfo &STI) const {
+unsigned
+PPCMCCodeEmitter::getTLSCallEncoding(const MCInst &MI, unsigned OpNo,
+                                     VectorWriter<MCFixup> &Fixups,
+                                     const MCSubtargetInfo &STI) const {
   // For special TLS calls, we need two fixups; one for the branch target
   // (__tls_get_addr), which we create via getDirectBrEncoding as usual,
   // and one for the TLSGD or TLSLD symbol, which is emitted here.
@@ -454,10 +456,10 @@ unsigned PPCMCCodeEmitter::getTLSCallEncoding(const MCInst &MI, unsigned OpNo,
   return getDirectBrEncoding(MI, OpNo, Fixups, STI);
 }
 
-unsigned PPCMCCodeEmitter::
-get_crbitm_encoding(const MCInst &MI, unsigned OpNo,
-                    SmallVectorImpl<MCFixup> &Fixups,
-                    const MCSubtargetInfo &STI) const {
+unsigned
+PPCMCCodeEmitter::get_crbitm_encoding(const MCInst &MI, unsigned OpNo,
+                                      VectorWriter<MCFixup> &Fixups,
+                                      const MCSubtargetInfo &STI) const {
   const MCOperand &MO = MI.getOperand(OpNo);
   assert((MI.getOpcode() == PPC::MTOCRF || MI.getOpcode() == PPC::MTOCRF8 ||
           MI.getOpcode() == PPC::MFOCRF || MI.getOpcode() == PPC::MFOCRF8) &&
@@ -479,10 +481,10 @@ static unsigned getOpIdxForMO(const MCInst &MI, const MCOperand &MO) {
   return ~0U; // Silence any warnings about no return.
 }
 
-uint64_t PPCMCCodeEmitter::
-getMachineOpValue(const MCInst &MI, const MCOperand &MO,
-                  SmallVectorImpl<MCFixup> &Fixups,
-                  const MCSubtargetInfo &STI) const {
+uint64_t PPCMCCodeEmitter::getMachineOpValue(const MCInst &MI,
+                                             const MCOperand &MO,
+                                             VectorWriter<MCFixup> &Fixups,
+                                             const MCSubtargetInfo &STI) const {
   if (MO.isReg()) {
     // MTOCRF/MFOCRF should go through get_crbitm_encoding for the CR operand.
     // The GPR operand should come through here though.
@@ -502,7 +504,7 @@ getMachineOpValue(const MCInst &MI, const MCOperand &MO,
 
 void PPCMCCodeEmitter::encodeInstruction(const MCInst &MI,
                                          SmallVectorImpl<char> &CB,
-                                         SmallVectorImpl<MCFixup> &Fixups,
+                                         VectorWriter<MCFixup> &Fixups,
                                          const MCSubtargetInfo &STI) const {
   uint64_t Bits = getBinaryCodeForInstr(MI, Fixups, STI);
 

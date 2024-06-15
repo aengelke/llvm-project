@@ -624,7 +624,7 @@ void CodeViewContext::encodeDefRange(MCAsmLayout &Layout,
   MCContext &Ctx = Layout.getAssembler().getContext();
   SmallVectorImpl<char> &Contents = Frag.getContents();
   Contents.clear();
-  SmallVectorImpl<MCFixup> &Fixups = Frag.getFixups();
+  auto Fixups = Frag.getFixupWriter(*MCCtx);
   Fixups.clear();
   raw_svector_ostream OS(Contents);
 

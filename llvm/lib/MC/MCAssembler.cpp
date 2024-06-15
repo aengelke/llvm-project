@@ -742,7 +742,7 @@ void MCAssembler::writeSectionData(raw_ostream &OS, const MCSection *Sec,
         // into a virtual section. This is to support clients which use standard
         // directives to fill the contents of virtual sections.
         const MCDataFragment &DF = cast<MCDataFragment>(F);
-        if (DF.fixup_begin() != DF.fixup_end())
+        if (!DF.getFixups().empty())
           getContext().reportError(SMLoc(), Sec->getVirtualSectionKind() +
                                                 " section '" + Sec->getName() +
                                                 "' cannot have fixups");
@@ -1012,10 +1012,12 @@ bool MCAssembler::relaxInstruction(MCAsmLayout &Layout,
 
   // Encode the new instruction.
   F.setInst(Relaxed);
-  F.getFixups().clear();
+  F.clearFixups();
   F.getContents().clear();
-  getEmitter().encodeInstruction(Relaxed, F.getContents(), F.getFixups(),
+  SmallVector<MCFixup> Fixups;
+  getEmitter().encodeInstruction(Relaxed, F.getContents(), Fixups,
                                  *F.getSubtargetInfo());
+  F.getFixupWriter(getContext()).append(Fixups);
   return true;
 }
 
@@ -1024,7 +1026,7 @@ bool MCAssembler::relaxLEB(MCAsmLayout &Layout, MCLEBFragment &LF) {
   unsigned PadTo = OldSize;
   int64_t Value;
   SmallVectorImpl<char> &Data = LF.getContents();
-  LF.getFixups().clear();
+  LF.clearFixups();
   // Use evaluateKnownAbsolute for Mach-O as a hack: .subsections_via_symbols
   // requires that .uleb128 A-B is foldable where A and B reside in different
   // fragments. This is used by __gcc_except_table.
@@ -1137,7 +1139,7 @@ bool MCAssembler::relaxDwarfLineAddr(MCAsmLayout &Layout,
   LineDelta = DF.getLineDelta();
   SmallVectorImpl<char> &Data = DF.getContents();
   Data.clear();
-  DF.getFixups().clear();
+  DF.clearFixups();
 
   MCDwarfLineAddr::encode(Context, getDWARFLinetableParams(), LineDelta,
                           AddrDelta, Data);
@@ -1163,7 +1165,7 @@ bool MCAssembler::relaxDwarfCallFrameFragment(MCAsmLayout &Layout,
   SmallVectorImpl<char> &Data = DF.getContents();
   uint64_t OldSize = Data.size();
   Data.clear();
-  DF.getFixups().clear();
+  DF.clearFixups();
 
   MCDwarfFrameEmitter::encodeAdvanceLoc(Context, Value, Data);
   return OldSize != Data.size();
@@ -1193,7 +1195,7 @@ bool MCAssembler::relaxPseudoProbeAddr(MCAsmLayout &Layout,
   SmallVectorImpl<char> &Data = PF.getContents();
   Data.clear();
   raw_svector_ostream OSE(Data);
-  PF.getFixups().clear();
+  PF.clearFixups();
 
   // AddrDelta is a signed integer
   encodeSLEB128(AddrDelta, OSE, OldSize);

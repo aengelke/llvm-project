@@ -265,6 +265,10 @@ void MCFragment::destroy() {
   }
 }
 
+VectorWriter<MCFixup> MCEncodedFragment::getFixupWriter(MCContext &Ctx) {
+  return Ctx.getFixupWriter(Fixups);
+}
+
 const MCSymbol *MCFragment::getAtom() const {
   return cast<MCSectionMachO>(Parent)->getAtom(LayoutOrder);
 }
@@ -339,13 +343,13 @@ LLVM_DUMP_METHOD void MCFragment::dump() const {
     }
     OS << "] (" << Contents.size() << " bytes)";
 
-    if (DF->fixup_begin() != DF->fixup_end()) {
+    if (size_t FixupCount = DF->getFixups().size()) {
       OS << ",\n       ";
       OS << " Fixups:[";
-      for (MCDataFragment::const_fixup_iterator it = DF->fixup_begin(),
-             ie = DF->fixup_end(); it != ie; ++it) {
-        if (it != DF->fixup_begin()) OS << ",\n                ";
-        OS << *it;
+      for (unsigned i = 0; i < FixupCount; ++i) {
+        if (i)
+          OS << ",\n                ";
+        OS << DF->getFixups()[i];
       }
       OS << "]";
     }

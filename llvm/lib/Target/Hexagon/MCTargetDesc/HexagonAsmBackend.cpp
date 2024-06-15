@@ -47,8 +47,8 @@ class HexagonAsmBackend : public MCAsmBackend {
   MCInst * Extender;
   unsigned MaxPacketSize;
 
-  void ReplaceInstruction(MCCodeEmitter &E, MCRelaxableFragment &RF,
-                          MCInst &HMB) const {
+  void ReplaceInstruction(MCContext &Ctx, MCCodeEmitter &E,
+                          MCRelaxableFragment &RF, MCInst &HMB) const {
     SmallVector<MCFixup, 4> Fixups;
     SmallString<256> Code;
     E.encodeInstruction(HMB, Code, Fixups, *RF.getSubtargetInfo());
@@ -56,7 +56,8 @@ class HexagonAsmBackend : public MCAsmBackend {
     // Update the fragment.
     RF.setInst(HMB);
     RF.getContents() = Code;
-    RF.getFixups() = Fixups;
+    RF.clearFixups();
+    RF.getFixupWriter(Ctx).append(Fixups);
   }
 
 public:
@@ -755,7 +756,7 @@ public:
                                             *RF.getSubtargetInfo(), Inst);
               //assert(!Error);
               (void)Error;
-              ReplaceInstruction(Asm.getEmitter(), RF, Inst);
+              ReplaceInstruction(Asm.getContext(), Asm.getEmitter(), RF, Inst);
               Layout.invalidateFragmentsFrom(&RF);
               Size = 0; // Only look back one instruction
               break;

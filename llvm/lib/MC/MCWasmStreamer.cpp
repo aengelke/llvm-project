@@ -193,12 +193,11 @@ void MCWasmStreamer::emitInstToData(const MCInst &Inst,
   MCDataFragment *DF = getOrCreateDataFragment();
 
   // Add the fixups and data.
-  for (unsigned I = 0, E = Fixups.size(); I != E; ++I) {
+  for (unsigned I = 0, E = Fixups.size(); I != E; ++I)
     Fixups[I].setOffset(Fixups[I].getOffset() + DF->getContents().size());
-    DF->getFixups().push_back(Fixups[I]);
-  }
   DF->setHasInstructions(STI);
   DF->getContents().append(Code.begin(), Code.end());
+  DF->getFixupWriter(getContext()).append(Fixups);
 }
 
 void MCWasmStreamer::finishImpl() {

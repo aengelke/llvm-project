@@ -10,6 +10,7 @@
 #define LLVM_MC_MCFRAGMENT_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SlabVectorStorage.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -24,6 +25,7 @@
 namespace llvm {
 
 class MCAssembler;
+class MCContext;
 class MCSection;
 class MCSubtargetInfo;
 class MCSymbol;
@@ -121,6 +123,8 @@ class MCEncodedFragment : public MCFragment {
 
   uint8_t BundlePadding = 0;
 
+  SlabVectorStorage<MCFixup>::Vector Fixups;
+
 protected:
   MCEncodedFragment(MCFragment::FragmentType FType, bool HasInstructions,
                     MCSection *Sec)
@@ -171,6 +175,14 @@ public:
     HasInstructions = true;
     this->STI = &STI;
   }
+
+  MutableArrayRef<MCFixup> getFixups() { return Fixups; }
+  ArrayRef<MCFixup> getFixups() const { return Fixups; }
+  void clearFixups() { Fixups.clear(); }
+  VectorWriter<MCFixup> getFixupWriter(MCContext &Ctx);
+  void addFixup(MCContext &Ctx, MCFixup Fixup) {
+    getFixupWriter(Ctx).push_back(Fixup);
+  }
 };
 
 /// Interface implemented by fragments that contain encoded instructions and/or
@@ -199,7 +211,7 @@ class MCEncodedFragmentWithFixups :
   public MCEncodedFragmentWithContents<ContentsSize> {
 
   /// The list of fixups in this fragment.
-  SmallVector<MCFixup, FixupsSize> Fixups;
+  // SmallVector<MCFixup, FixupsSize> Fixups;
 
 protected:
   MCEncodedFragmentWithFixups(MCFragment::FragmentType FType,
@@ -209,18 +221,10 @@ protected:
                                                     Sec) {}
 
 public:
-
-  using const_fixup_iterator = SmallVectorImpl<MCFixup>::const_iterator;
-  using fixup_iterator = SmallVectorImpl<MCFixup>::iterator;
-
-  SmallVectorImpl<MCFixup> &getFixups() { return Fixups; }
-  const SmallVectorImpl<MCFixup> &getFixups() const { return Fixups; }
-
-  fixup_iterator fixup_begin() { return Fixups.begin(); }
-  const_fixup_iterator fixup_begin() const { return Fixups.begin(); }
-
-  fixup_iterator fixup_end() { return Fixups.end(); }
-  const_fixup_iterator fixup_end() const { return Fixups.end(); }
+  // void addFixup(MCFixup Fixup) { Fixups.push_back(Fixup); }
+  // void addFixups(ArrayRef<MCFixup> NewFixups) {
+  //   Fixups.append(NewFixups.begin(), NewFixups.end());
+  // }
 
   static bool classof(const MCFragment *F) {
     MCFragment::FragmentType Kind = F->getKind();

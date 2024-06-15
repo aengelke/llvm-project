@@ -213,7 +213,6 @@ bool RISCVAsmBackend::relaxDwarfLineAddr(MCDwarfLineAddrFragment &DF,
   int64_t LineDelta = DF.getLineDelta();
   const MCExpr &AddrDelta = DF.getAddrDelta();
   SmallVectorImpl<char> &Data = DF.getContents();
-  SmallVectorImpl<MCFixup> &Fixups = DF.getFixups();
   size_t OldSize = Data.size();
 
   int64_t Value;
@@ -222,7 +221,7 @@ bool RISCVAsmBackend::relaxDwarfLineAddr(MCDwarfLineAddrFragment &DF,
   assert(IsAbsolute && "CFA with invalid expression");
 
   Data.clear();
-  Fixups.clear();
+  DF.clearFixups();
   raw_svector_ostream OS(Data);
 
   // INT64_MAX is a signal that this is actually a DW_LNE_end_sequence.
@@ -256,8 +255,10 @@ bool RISCVAsmBackend::relaxDwarfLineAddr(MCDwarfLineAddrFragment &DF,
   }
 
   const MCBinaryExpr &MBE = cast<MCBinaryExpr>(AddrDelta);
-  Fixups.push_back(MCFixup::create(Offset, MBE.getLHS(), std::get<0>(Fixup)));
-  Fixups.push_back(MCFixup::create(Offset, MBE.getRHS(), std::get<1>(Fixup)));
+  DF.addFixup(Layout.getAssembler().getContext(),
+              MCFixup::create(Offset, MBE.getLHS(), std::get<0>(Fixup)));
+  DF.addFixup(Layout.getAssembler().getContext(),
+              MCFixup::create(Offset, MBE.getRHS(), std::get<1>(Fixup)));
 
   if (LineDelta == INT64_MAX) {
     OS << uint8_t(dwarf::DW_LNS_extended_op);
@@ -276,7 +277,6 @@ bool RISCVAsmBackend::relaxDwarfCFA(MCDwarfCallFrameFragment &DF,
                                     bool &WasRelaxed) const {
   const MCExpr &AddrDelta = DF.getAddrDelta();
   SmallVectorImpl<char> &Data = DF.getContents();
-  SmallVectorImpl<MCFixup> &Fixups = DF.getFixups();
   size_t OldSize = Data.size();
 
   int64_t Value;
@@ -287,7 +287,7 @@ bool RISCVAsmBackend::relaxDwarfCFA(MCDwarfCallFrameFragment &DF,
   assert(IsAbsolute && "CFA with invalid expression");
 
   Data.clear();
-  Fixups.clear();
+  DF.clearFixups();
   raw_svector_ostream OS(Data);
 
   assert(
@@ -299,17 +299,18 @@ bool RISCVAsmBackend::relaxDwarfCFA(MCDwarfCallFrameFragment &DF,
     return true;
   }
 
-  auto AddFixups = [&Fixups, &AddrDelta](unsigned Offset,
-                                         std::pair<unsigned, unsigned> Fixup) {
+  MCContext &Ctx = Layout.getAssembler().getContext();
+  auto AddFixups = [&DF, &Ctx, &AddrDelta](
+                       unsigned Offset, std::pair<unsigned, unsigned> Fixup) {
     const MCBinaryExpr &MBE = cast<MCBinaryExpr>(AddrDelta);
-    Fixups.push_back(
-        MCFixup::create(Offset, MBE.getLHS(),
-                        static_cast<MCFixupKind>(FirstLiteralRelocationKind +
-                                                 std::get<0>(Fixup))));
-    Fixups.push_back(
-        MCFixup::create(Offset, MBE.getRHS(),
-                        static_cast<MCFixupKind>(FirstLiteralRelocationKind +
-                                                 std::get<1>(Fixup))));
+    DF.addFixup(Ctx, MCFixup::create(
+                         Offset, MBE.getLHS(),
+                         static_cast<MCFixupKind>(FirstLiteralRelocationKind +
+                                                  std::get<0>(Fixup))));
+    DF.addFixup(Ctx, MCFixup::create(
+                         Offset, MBE.getRHS(),
+                         static_cast<MCFixupKind>(FirstLiteralRelocationKind +
+                                                  std::get<1>(Fixup))));
   };
 
   if (isUIntN(6, Value)) {
@@ -342,8 +343,8 @@ std::pair<bool, bool> RISCVAsmBackend::relaxLEB128(MCLEBFragment &LF,
     return std::make_pair(false, false);
   const MCExpr &Expr = LF.getValue();
   if (ULEB128Reloc) {
-    LF.getFixups().push_back(
-        MCFixup::create(0, &Expr, FK_Data_leb128, Expr.getLoc()));
+    LF.addFixup(Layout.getAssembler().getContext(),
+                MCFixup::create(0, &Expr, FK_Data_leb128, Expr.getLoc()));
   }
   return std::make_pair(Expr.evaluateKnownAbsolute(Value, Layout), false);
 }

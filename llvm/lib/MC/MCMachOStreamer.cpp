@@ -489,12 +489,11 @@ void MCMachOStreamer::emitInstToData(const MCInst &Inst,
   getAssembler().getEmitter().encodeInstruction(Inst, Code, Fixups, STI);
 
   // Add the fixups and data.
-  for (MCFixup &Fixup : Fixups) {
+  for (MCFixup &Fixup : Fixups)
     Fixup.setOffset(Fixup.getOffset() + DF->getContents().size());
-    DF->getFixups().push_back(Fixup);
-  }
   DF->setHasInstructions(STI);
   DF->getContents().append(Code.begin(), Code.end());
+  DF->getFixupWriter(getContext()).append(Fixups);
 }
 
 void MCMachOStreamer::finishImpl() {

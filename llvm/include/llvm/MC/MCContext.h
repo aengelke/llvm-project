@@ -11,6 +11,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SlabVectorStorage.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -146,6 +147,8 @@ private:
   SpecificBumpPtrAllocator<MCInst> MCInstAllocator;
 
   SpecificBumpPtrAllocator<wasm::WasmSignature> WasmSignatureAllocator;
+
+  SlabVectorStorage<MCFixup> FixupStorage;
 
   /// Bindings of names to symbols.
   SymbolTable Symbols;
@@ -434,6 +437,12 @@ public:
   void reset();
 
   /// @}
+
+  /// \name Fragment Management
+  VectorWriter<MCFixup>
+  getFixupWriter(typename SlabVectorStorage<MCFixup>::Vector &V) {
+    return VectorWriter<MCFixup>(FixupStorage, V);
+  }
 
   /// \name McInst Management
 

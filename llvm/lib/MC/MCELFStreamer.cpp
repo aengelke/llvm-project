@@ -572,16 +572,15 @@ void MCELFStreamer::emitInstToData(const MCInst &Inst,
   }
 
   // Add the fixups and data.
-  for (auto &Fixup : Fixups) {
+  for (auto &Fixup : Fixups)
     Fixup.setOffset(Fixup.getOffset() + DF->getContents().size());
-    DF->getFixups().push_back(Fixup);
-  }
 
   DF->setHasInstructions(STI);
   if (!Fixups.empty() && Fixups.back().getTargetKind() ==
                              getAssembler().getBackend().RelaxFixupKind)
     DF->setLinkerRelaxable();
   DF->getContents().append(Code.begin(), Code.end());
+  DF->getFixupWriter(getContext()).append(Fixups);
 }
 
 void MCELFStreamer::emitBundleAlignMode(Align Alignment) {

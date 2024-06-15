@@ -1184,8 +1184,8 @@ inline void ARMELFStreamer::SwitchToExIdxSection(const MCSymbol &FnStart) {
 
 void ARMELFStreamer::EmitFixup(const MCExpr *Expr, MCFixupKind Kind) {
   MCDataFragment *Frag = getOrCreateDataFragment();
-  Frag->getFixups().push_back(MCFixup::create(Frag->getContents().size(), Expr,
-                                              Kind));
+  Frag->addFixup(getContext(),
+                 MCFixup::create(Frag->getContents().size(), Expr, Kind));
 }
 
 void ARMELFStreamer::EHReset() {
@@ -1277,9 +1277,9 @@ void ARMELFStreamer::EmitPersonalityFixup(StringRef Name) {
 
   visitUsedExpr(*PersonalityRef);
   MCDataFragment *DF = getOrCreateDataFragment();
-  DF->getFixups().push_back(MCFixup::create(DF->getContents().size(),
-                                            PersonalityRef,
-                                            MCFixup::getKindForSize(4, false)));
+  DF->addFixup(getContext(),
+               MCFixup::create(DF->getContents().size(), PersonalityRef,
+                               MCFixup::getKindForSize(4, false)));
 }
 
 void ARMELFStreamer::FlushPendingOffset() {

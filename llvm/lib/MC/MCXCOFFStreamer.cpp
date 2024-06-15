@@ -92,8 +92,8 @@ void MCXCOFFStreamer::emitXCOFFRefDirective(const MCSymbol *Symbol) {
     report_fatal_error("failed to get fixup kind for R_REF relocation");
 
   MCFixupKind Kind = *MaybeKind;
-  MCFixup Fixup = MCFixup::create(DF->getContents().size(), SRE, Kind);
-  DF->getFixups().push_back(Fixup);
+  DF->addFixup(getContext(),
+               MCFixup::create(DF->getContents().size(), SRE, Kind));
 }
 
 void MCXCOFFStreamer::emitXCOFFRenameDirective(const MCSymbol *Name,
@@ -149,14 +149,12 @@ void MCXCOFFStreamer::emitInstToData(const MCInst &Inst,
   // Add the fixups and data.
   MCDataFragment *DF = getOrCreateDataFragment(&STI);
   const size_t ContentsSize = DF->getContents().size();
-  auto &DataFragmentFixups = DF->getFixups();
-  for (auto &Fixup : Fixups) {
+  for (auto &Fixup : Fixups)
     Fixup.setOffset(Fixup.getOffset() + ContentsSize);
-    DataFragmentFixups.push_back(Fixup);
-  }
 
   DF->setHasInstructions(STI);
   DF->getContents().append(Code.begin(), Code.end());
+  DF->getFixupWriter(getContext()).append(Fixups);
 }
 
 MCStreamer *llvm::createXCOFFStreamer(MCContext &Context,

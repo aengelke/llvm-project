@@ -192,14 +192,15 @@ public:
   void relaxInstruction(MCInst &Inst,
                         const MCSubtargetInfo &STI) const override;
 
-  bool padInstructionViaRelaxation(MCRelaxableFragment &RF,
+  bool padInstructionViaRelaxation(MCRelaxableFragment &RF, MCContext &Ctx,
                                    MCCodeEmitter &Emitter,
                                    unsigned &RemainingSize) const;
 
   bool padInstructionViaPrefix(MCRelaxableFragment &RF, MCCodeEmitter &Emitter,
                                unsigned &RemainingSize) const;
 
-  bool padInstructionEncoding(MCRelaxableFragment &RF, MCCodeEmitter &Emitter,
+  bool padInstructionEncoding(MCRelaxableFragment &RF, MCContext &Ctx,
+                              MCCodeEmitter &Emitter,
                               unsigned &RemainingSize) const;
 
   void finishLayout(MCAssembler const &Asm, MCAsmLayout &Layout) const override;
@@ -822,6 +823,7 @@ bool X86AsmBackend::padInstructionViaPrefix(MCRelaxableFragment &RF,
 }
 
 bool X86AsmBackend::padInstructionViaRelaxation(MCRelaxableFragment &RF,
+                                                MCContext &Ctx,
                                                 MCCodeEmitter &Emitter,
                                                 unsigned &RemainingSize) const {
   if (!mayNeedRelaxation(RF.getInst(), *RF.getSubtargetInfo()))
@@ -843,17 +845,19 @@ bool X86AsmBackend::padInstructionViaRelaxation(MCRelaxableFragment &RF,
     return false;
   RF.setInst(Relaxed);
   RF.getContents() = Code;
-  RF.getFixups() = Fixups;
+  RF.clearFixups();
+  RF.getFixupWriter(Ctx).append(Fixups);
   RemainingSize -= Delta;
   return true;
 }
 
 bool X86AsmBackend::padInstructionEncoding(MCRelaxableFragment &RF,
+                                           MCContext &Ctx,
                                            MCCodeEmitter &Emitter,
                                            unsigned &RemainingSize) const {
   bool Changed = false;
   if (RemainingSize != 0)
-    Changed |= padInstructionViaRelaxation(RF, Emitter, RemainingSize);
+    Changed |= padInstructionViaRelaxation(RF, Ctx, Emitter, RemainingSize);
   if (RemainingSize != 0)
     Changed |= padInstructionViaPrefix(RF, Emitter, RemainingSize);
   return Changed;
@@ -931,7 +935,8 @@ void X86AsmBackend::finishLayout(MCAssembler const &Asm,
         // Give the backend a chance to play any tricks it wishes to increase
         // the encoding size of the given instruction.  Target independent code
         // will try further relaxation, but target's may play further tricks.
-        if (padInstructionEncoding(RF, Asm.getEmitter(), RemainingSize))
+        if (padInstructionEncoding(RF, Asm.getContext(), Asm.getEmitter(),
+                                   RemainingSize))
           FirstChangedFragment = &RF;
 
         // If we have an instruction which hasn't been fully relaxed, we can't

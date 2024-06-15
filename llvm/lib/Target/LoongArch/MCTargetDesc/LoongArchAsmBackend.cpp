@@ -305,8 +305,8 @@ std::pair<bool, bool> LoongArchAsmBackend::relaxLEB128(MCLEBFragment &LF,
   const MCExpr &Expr = LF.getValue();
   if (LF.isSigned() || !Expr.evaluateKnownAbsolute(Value, Layout))
     return std::make_pair(false, false);
-  LF.getFixups().push_back(
-      MCFixup::create(0, &Expr, FK_Data_leb128, Expr.getLoc()));
+  LF.addFixup(Layout.getAssembler().getContext(),
+              MCFixup::create(0, &Expr, FK_Data_leb128, Expr.getLoc()));
   return std::make_pair(true, true);
 }
 
@@ -318,7 +318,6 @@ bool LoongArchAsmBackend::relaxDwarfLineAddr(MCDwarfLineAddrFragment &DF,
   int64_t LineDelta = DF.getLineDelta();
   const MCExpr &AddrDelta = DF.getAddrDelta();
   SmallVectorImpl<char> &Data = DF.getContents();
-  SmallVectorImpl<MCFixup> &Fixups = DF.getFixups();
   size_t OldSize = Data.size();
 
   int64_t Value;
@@ -329,6 +328,7 @@ bool LoongArchAsmBackend::relaxDwarfLineAddr(MCDwarfLineAddrFragment &DF,
   (void)IsAbsolute;
 
   Data.clear();
+  auto Fixups = DF.getFixupWriter(C);
   Fixups.clear();
   raw_svector_ostream OS(Data);
 
@@ -383,7 +383,6 @@ bool LoongArchAsmBackend::relaxDwarfCFA(MCDwarfCallFrameFragment &DF,
                                         bool &WasRelaxed) const {
   const MCExpr &AddrDelta = DF.getAddrDelta();
   SmallVectorImpl<char> &Data = DF.getContents();
-  SmallVectorImpl<MCFixup> &Fixups = DF.getFixups();
   size_t OldSize = Data.size();
 
   int64_t Value;
@@ -394,7 +393,7 @@ bool LoongArchAsmBackend::relaxDwarfCFA(MCDwarfCallFrameFragment &DF,
   (void)IsAbsolute;
 
   Data.clear();
-  Fixups.clear();
+  DF.clearFixups();
   raw_svector_ostream OS(Data);
 
   assert(
@@ -406,12 +405,13 @@ bool LoongArchAsmBackend::relaxDwarfCFA(MCDwarfCallFrameFragment &DF,
     return true;
   }
 
-  auto AddFixups = [&Fixups,
+  MCContext &Ctx = Layout.getAssembler().getContext();
+  auto AddFixups = [&DF, &Ctx,
                     &AddrDelta](unsigned Offset,
                                 std::pair<MCFixupKind, MCFixupKind> FK) {
     const MCBinaryExpr &MBE = cast<MCBinaryExpr>(AddrDelta);
-    Fixups.push_back(MCFixup::create(Offset, MBE.getLHS(), std::get<0>(FK)));
-    Fixups.push_back(MCFixup::create(Offset, MBE.getRHS(), std::get<1>(FK)));
+    DF.addFixup(Ctx, MCFixup::create(Offset, MBE.getLHS(), std::get<0>(FK)));
+    DF.addFixup(Ctx, MCFixup::create(Offset, MBE.getRHS(), std::get<1>(FK)));
   };
 
   if (isUIntN(6, Value)) {

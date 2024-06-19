@@ -1069,14 +1069,14 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
 
   createMemtagRelocs(Asm);
 
-  std::map<const MCSymbol *, std::vector<const MCSectionELF *>> GroupMembers;
-
   // Write out the ELF header ...
   writeHeader(Asm);
 
   // ... then the sections ...
-  std::vector<MCSectionELF *> Groups;
-  std::vector<MCSectionELF *> Relocations;
+  SmallVector<std::pair<MCSectionELF *, SmallVector<unsigned>>, 0> Groups;
+  // Map from group section index to group
+  SmallVector<unsigned, 0> GroupMap;
+  SmallVector<MCSectionELF *> Relocations;
   for (MCSection &Sec : Asm) {
     MCSectionELF &Section = static_cast<MCSectionELF &>(Sec);
     if (Mode == NonDwoOnly && isDwoSection(Section))
@@ -1095,21 +1095,20 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
 
     MCSectionELF *RelSection = createRelocationSection(Ctx, Section);
 
+    unsigned GroupIdx = 0;
     if (SignatureSymbol) {
-      unsigned GroupIdx = SignatureSymbol->getGroupIndex();
+      GroupIdx = SignatureSymbol->getGroupIndex();
       if (!GroupIdx) {
         MCSectionELF *Group =
             Ctx.createELFGroupSection(SignatureSymbol, Section.isComdat());
         GroupIdx = addToSectionTable(Group);
         SignatureSymbol->setGroupIndex(GroupIdx);
         Group->setAlignment(Align(4));
-        Groups.push_back(Group);
+
+        GroupMap.resize(GroupIdx + 1);
+        GroupMap[GroupIdx] = Groups.size();
+        Groups.emplace_back(Group, SmallVector<unsigned>{});
       }
-      std::vector<const MCSectionELF *> &Members =
-          GroupMembers[SignatureSymbol];
-      Members.push_back(&Section);
-      if (RelSection)
-        Members.push_back(RelSection);
     }
 
     Section.setLayoutOrder(addToSectionTable(&Section));
@@ -1118,18 +1117,22 @@ uint64_t ELFWriter::writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) {
       Relocations.push_back(RelSection);
     }
 
+    if (GroupIdx) {
+      auto &Members = Groups[GroupMap[GroupIdx]];
+      Members.second.push_back(Section.getLayoutOrder());
+      if (RelSection)
+        Members.second.push_back(RelSection->getLayoutOrder());
+    }
+
     OWriter.TargetObjectWriter->addTargetSectionFlags(Ctx, Section);
   }
 
-  for (MCSectionELF *Group : Groups) {
+  for (auto &[Group, Members] : Groups) {
     // Remember the offset into the file for this section.
     const uint64_t SecStart = align(Group->getAlign());
 
-    const MCSymbol *SignatureSymbol = Group->getGroup();
-    assert(SignatureSymbol);
     write(uint32_t(Group->isComdat() ? unsigned(ELF::GRP_COMDAT) : 0));
-    for (const MCSectionELF *Member : GroupMembers[SignatureSymbol])
-      write(Member->getLayoutOrder());
+    W.write<unsigned>(Members);
 
     uint64_t SecEnd = W.OS.tell();
     Group->setOffsets(SecStart, SecEnd);

@@ -209,8 +209,8 @@ protected:
   std::vector<HandlerInfo> Handlers;
   size_t NumUserHandlers = 0;
 
-  /// Debuginfo handler. Protected so that targets can set their own.
-  std::unique_ptr<DebugHandlerBase> DH;
+  /// Debuginfo handler. Protected so that targets can add their own.
+  SmallVector<std::unique_ptr<DebugHandlerBase>, 1> DebugHandlers;
 
   StackMaps SM;
 

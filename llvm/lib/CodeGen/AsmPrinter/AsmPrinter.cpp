@@ -545,12 +545,12 @@ bool AsmPrinter::doInitialization(Module &M) {
   if (MAI->doesSupportDebugInformation()) {
     bool EmitCodeView = M.getCodeViewFlag();
     if (EmitCodeView && TM.getTargetTriple().isOSWindows())
-      DH = std::make_unique<CodeViewDebug>(this);
+      DebugHandlers.push_back(std::make_unique<CodeViewDebug>(this));
     if (!EmitCodeView || M.getDwarfVersion()) {
       assert(MMI && "MMI could not be nullptr here!");
       if (MMI->hasDebugInfo()) {
         DD = new DwarfDebug(this);
-        DH = std::unique_ptr<DwarfDebug>(DD);
+        DebugHandlers.push_back(std::unique_ptr<DwarfDebug>(DD));
       }
     }
   }
@@ -623,7 +623,7 @@ bool AsmPrinter::doInitialization(Module &M) {
                           CFGuardDescription, DWARFGroupName,
                           DWARFGroupDescription);
 
-  if (DH)
+  for (auto &DH : DebugHandlers)
     DH->beginModule(&M);
   for (const HandlerInfo &HI : Handlers) {
     NamedRegionTimer T(HI.TimerName, HI.TimerDescription, HI.TimerGroupName,
@@ -776,7 +776,7 @@ void AsmPrinter::emitGlobalVariable(const GlobalVariable *GV) {
   // sections and expected to be contiguous (e.g. ObjC metadata).
   const Align Alignment = getGVAlignment(GV, DL);
 
-  if (DH)
+  for (auto &DH : DebugHandlers)
     DH->setSymbolSize(GVSym, Size);
 
   // Handle common symbols
@@ -1048,7 +1048,7 @@ void AsmPrinter::emitFunctionHeader() {
   }
 
   // Emit pre-function debug and/or EH information.
-  if (DH) {
+  for (auto &DH : DebugHandlers) {
     DH->beginFunction(MF);
     DH->beginBasicBlockSection(MF->front());
   }
@@ -1755,7 +1755,7 @@ void AsmPrinter::emitFunctionBody() {
       if (MDNode *MD = MI.getPCSections())
         emitPCSectionsLabel(*MF, *MD);
 
-      if (DH)
+      for (auto &DH : DebugHandlers)
         DH->beginInstruction(&MI);
 
       if (isVerbose())
@@ -1850,7 +1850,7 @@ void AsmPrinter::emitFunctionBody() {
       if (MCSymbol *S = MI.getPostInstrSymbol())
         OutStreamer->emitLabel(S);
 
-      if (DH)
+      for (auto &DH : DebugHandlers)
         DH->endInstruction();
     }
 
@@ -1982,7 +1982,7 @@ void AsmPrinter::emitFunctionBody() {
   // Call endBasicBlockSection on the last block now, if it wasn't already
   // called.
   if (!MF->back().isEndSection()) {
-    if (DH)
+    for (auto &DH : DebugHandlers)
       DH->endBasicBlockSection(MF->back());
     for (const HandlerInfo &HI : Handlers) {
       NamedRegionTimer T(HI.TimerName, HI.TimerDescription, HI.TimerGroupName,
@@ -2003,7 +2003,7 @@ void AsmPrinter::emitFunctionBody() {
   emitJumpTableInfo();
 
   // Emit post-function debug and/or EH information.
-  if (DH)
+  for (auto &DH : DebugHandlers)
     DH->endFunction(MF);
   for (const HandlerInfo &HI : Handlers) {
     NamedRegionTimer T(HI.TimerName, HI.TimerDescription, HI.TimerGroupName,
@@ -2446,7 +2446,7 @@ bool AsmPrinter::doFinalization(Module &M) {
     emitGlobalIFunc(M, IFunc);
 
   // Finalize debug and EH information.
-  if (DH)
+  for (auto &DH : DebugHandlers)
     DH->endModule();
   for (const HandlerInfo &HI : Handlers) {
     NamedRegionTimer T(HI.TimerName, HI.TimerDescription, HI.TimerGroupName,
@@ -2458,7 +2458,7 @@ bool AsmPrinter::doFinalization(Module &M) {
   // keeping all the user-added handlers alive until the AsmPrinter is
   // destroyed.
   Handlers.erase(Handlers.begin() + NumUserHandlers, Handlers.end());
-  DH.reset();
+  DebugHandlers.clear();
   DD = nullptr;
 
   // If the target wants to know about weak references, print them all.
@@ -4046,7 +4046,7 @@ void AsmPrinter::emitBasicBlockStart(const MachineBasicBlock &MBB) {
   // if it begins a section (Entry block call is handled separately, next to
   // beginFunction).
   if (MBB.isBeginSection() && !MBB.isEntryBlock()) {
-    if (DH)
+    for (auto &DH : DebugHandlers)
       DH->beginBasicBlockSection(MBB);
     for (const HandlerInfo &HI : Handlers)
       HI.Handler->beginBasicBlockSection(MBB);
@@ -4057,7 +4057,7 @@ void AsmPrinter::emitBasicBlockEnd(const MachineBasicBlock &MBB) {
   // Check if CFI information needs to be updated for this MBB with basic block
   // sections.
   if (MBB.isEndSection()) {
-    if (DH)
+    for (auto &DH : DebugHandlers)
       DH->endBasicBlockSection(MBB);
     for (const HandlerInfo &HI : Handlers)
       HI.Handler->endBasicBlockSection(MBB);

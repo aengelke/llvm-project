@@ -537,20 +537,18 @@ bool AsmPrinter::doInitialization(Module &M) {
   if (MAI->doesSupportDebugInformation()) {
     bool EmitCodeView = M.getCodeViewFlag();
     if (EmitCodeView && TM.getTargetTriple().isOSWindows())
-      Handlers.push_back(std::make_unique<CodeViewDebug>(this));
+      DebugHandlers.push_back(std::make_unique<CodeViewDebug>(this));
     if (!EmitCodeView || M.getDwarfVersion()) {
       assert(MMI && "MMI could not be nullptr here!");
       if (MMI->hasDebugInfo()) {
         DD = new DwarfDebug(this);
-        Handlers.push_back(std::unique_ptr<DwarfDebug>(DD));
+        DebugHandlers.push_back(std::unique_ptr<DwarfDebug>(DD));
       }
     }
   }
 
-  if (M.getNamedMetadata(PseudoProbeDescMetadataName)) {
-    PP = new PseudoProbeHandler(this);
-    Handlers.push_back(std::unique_ptr<PseudoProbeHandler>(PP));
-  }
+  if (M.getNamedMetadata(PseudoProbeDescMetadataName))
+    PP = std::make_unique<PseudoProbeHandler>(this);
 
   switch (MAI->getExceptionHandlingType()) {
   case ExceptionHandling::None:
@@ -613,6 +611,8 @@ bool AsmPrinter::doInitialization(Module &M) {
   if (mdconst::extract_or_null<ConstantInt>(M.getModuleFlag("cfguard")))
     Handlers.push_back(std::make_unique<WinCFGuard>(this));
 
+  for (auto &DH : DebugHandlers)
+    DH->beginModule(&M);
   for (auto &Handler : Handlers)
     Handler->beginModule(&M);
 
@@ -761,9 +761,8 @@ void AsmPrinter::emitGlobalVariable(const GlobalVariable *GV) {
   // sections and expected to be contiguous (e.g. ObjC metadata).
   const Align Alignment = getGVAlignment(GV, DL);
 
-  for (auto &Handler : Handlers) {
-    Handler->setSymbolSize(GVSym, Size);
-  }
+  for (auto &DH : DebugHandlers)
+    DH->setSymbolSize(GVSym, Size);
 
   // Handle common symbols
   if (GVKind.isCommon()) {
@@ -1034,6 +1033,10 @@ void AsmPrinter::emitFunctionHeader() {
   }
 
   // Emit pre-function debug and/or EH information.
+  for (auto &DH : DebugHandlers) {
+    DH->beginFunction(MF);
+    DH->beginBasicBlockSection(MF->front());
+  }
   for (auto &Handler : Handlers)
     Handler->beginFunction(MF);
   for (auto &Handler : Handlers)
@@ -1731,8 +1734,8 @@ void AsmPrinter::emitFunctionBody() {
       if (MDNode *MD = MI.getPCSections())
         emitPCSectionsLabel(*MF, *MD);
 
-      for (auto &Handler : Handlers)
-        Handler->beginInstruction(&MI);
+      for (auto &DH : DebugHandlers)
+        DH->beginInstruction(&MI);
 
       if (isVerbose())
         emitComments(MI, OutStreamer->getCommentOS());
@@ -1826,8 +1829,8 @@ void AsmPrinter::emitFunctionBody() {
       if (MCSymbol *S = MI.getPostInstrSymbol())
         OutStreamer->emitLabel(S);
 
-      for (auto &Handler : Handlers)
-        Handler->endInstruction();
+      for (auto &DH : DebugHandlers)
+        DH->endInstruction();
     }
 
     // We must emit temporary symbol for the end of this basic block, if either
@@ -1958,6 +1961,8 @@ void AsmPrinter::emitFunctionBody() {
   // Call endBasicBlockSection on the last block now, if it wasn't already
   // called.
   if (!MF->back().isEndSection()) {
+    for (auto &DH : DebugHandlers)
+      DH->endBasicBlockSection(MF->back());
     for (auto &Handler : Handlers)
       Handler->endBasicBlockSection(MF->back());
   }
@@ -1971,6 +1976,8 @@ void AsmPrinter::emitFunctionBody() {
   emitJumpTableInfo();
 
   // Emit post-function debug and/or EH information.
+  for (auto &DH : DebugHandlers)
+    DH->endFunction(MF);
   for (auto &Handler : Handlers)
     Handler->endFunction(MF);
 
@@ -2409,6 +2416,8 @@ bool AsmPrinter::doFinalization(Module &M) {
     emitGlobalIFunc(M, IFunc);
 
   // Finalize debug and EH information.
+  for (auto &DH : DebugHandlers)
+    DH->endModule();
   for (auto &Handler : Handlers)
     Handler->endModule();
 
@@ -2416,6 +2425,7 @@ bool AsmPrinter::doFinalization(Module &M) {
   // keeping all the user-added handlers alive until the AsmPrinter is
   // destroyed.
   Handlers.erase(Handlers.begin() + NumUserHandlers, Handlers.end());
+  DebugHandlers.clear();
   DD = nullptr;
 
   // If the target wants to know about weak references, print them all.
@@ -4002,17 +4012,23 @@ void AsmPrinter::emitBasicBlockStart(const MachineBasicBlock &MBB) {
   // With BB sections, each basic block must handle CFI information on its own
   // if it begins a section (Entry block call is handled separately, next to
   // beginFunction).
-  if (MBB.isBeginSection() && !MBB.isEntryBlock())
+  if (MBB.isBeginSection() && !MBB.isEntryBlock()) {
+    for (auto &DH : DebugHandlers)
+      DH->beginBasicBlockSection(MBB);
     for (auto &Handler : Handlers)
       Handler->beginBasicBlockSection(MBB);
+  }
 }
 
 void AsmPrinter::emitBasicBlockEnd(const MachineBasicBlock &MBB) {
   // Check if CFI information needs to be updated for this MBB with basic block
   // sections.
-  if (MBB.isEndSection())
+  if (MBB.isEndSection()) {
+    for (auto &DH : DebugHandlers)
+      DH->endBasicBlockSection(MBB);
     for (auto &Handler : Handlers)
       Handler->endBasicBlockSection(MBB);
+  }
 }
 
 void AsmPrinter::emitVisibility(MCSymbol *Sym, unsigned Visibility,

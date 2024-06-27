@@ -398,9 +398,7 @@ protected:
       return false;
 
     auto *AP = TestPrinter->getAP();
-    AP->addAsmPrinterHandler(AsmPrinter::HandlerInfo(
-        std::unique_ptr<AsmPrinterHandler>(new TestHandler(*this)),
-        "TestTimerName", "TestTimerDesc", "TestGroupName", "TestGroupDesc"));
+    AP->addAsmPrinterHandler(std::make_unique<TestHandler>(*this));
     LLVMTargetMachine *LLVMTM = static_cast<LLVMTargetMachine *>(&AP->TM);
     legacy::PassManager PM;
     PM.add(new MachineModuleInfoWrapperPass(LLVMTM));
@@ -410,9 +408,7 @@ protected:
     M->setDataLayout(LLVMTM->createDataLayout());
     PM.run(*M);
     // Now check that we can run it twice.
-    AP->addAsmPrinterHandler(AsmPrinter::HandlerInfo(
-        std::unique_ptr<AsmPrinterHandler>(new TestHandler(*this)),
-        "TestTimerName", "TestTimerDesc", "TestGroupName", "TestGroupDesc"));
+    AP->addAsmPrinterHandler(std::make_unique<TestHandler>(*this));
     PM.run(*M);
     return true;
   }

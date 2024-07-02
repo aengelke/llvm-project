@@ -222,18 +222,7 @@ public:
   }
 
   raw_ostream &operator<<(StringRef Str) {
-    // Inline fast path, particularly for strings with a known length.
-    size_t Size = Str.size();
-
-    // Make sure we can use the fast path.
-    if (Size > (size_t)(OutBufEnd - OutBufCur))
-      return write(Str.data(), Size);
-
-    if (Size) {
-      memcpy(OutBufCur, Str.data(), Size);
-      OutBufCur += Size;
-    }
-    return *this;
+    return write(Str.data(), Str.size());
   }
 
 #if defined(__cpp_char8_t)
@@ -258,7 +247,6 @@ public:
   }
 
   raw_ostream &operator<<(const std::string &Str) {
-    // Avoid the fast path, it would only increase code size for a marginal win.
     return write(Str.data(), Str.length());
   }
 
@@ -300,8 +288,25 @@ public:
   /// satisfy llvm::isPrint into an escape sequence.
   raw_ostream &write_escaped(StringRef Str, bool UseHexEscapes = false);
 
-  raw_ostream &write(unsigned char C);
-  raw_ostream &write(const char *Ptr, size_t Size);
+  raw_ostream &write(unsigned char C) {
+    if (OutBufCur >= OutBufEnd)
+      writeSlow(C);
+    else
+      *OutBufCur++ = C;
+    return *this;
+  }
+
+  raw_ostream &write(const char *Ptr, size_t Size) {
+    // Inline fast path
+    if (LLVM_UNLIKELY(size_t(OutBufEnd - OutBufCur) < Size)) {
+      writeSlow(Ptr, Size);
+      return *this;
+    }
+    if (Size)
+      memcpy(OutBufCur, Ptr, Size);
+    OutBufCur += Size;
+    return *this;
+  }
 
   // Formatted output, see the format() function in Support/Format.h.
   raw_ostream &operator<<(const format_object_base &Fmt);
@@ -405,6 +410,10 @@ private:
   /// Flush the current buffer, which is known to be non-empty. This outputs the
   /// currently buffered data and resets the buffer to empty.
   void flush_nonempty();
+
+  /// Slow path for writing when buffer is too small.
+  void writeSlow(unsigned char C);
+  void writeSlow(const char *Ptr, size_t Size);
 
   /// Copy data into the buffer. Size must not be greater than the number of
   /// unused bytes in the buffer.

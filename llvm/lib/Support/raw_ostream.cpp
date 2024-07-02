@@ -224,37 +224,38 @@ void raw_ostream::flush_nonempty() {
   write_impl(OutBufStart, Length);
 }
 
-raw_ostream &raw_ostream::write(unsigned char C) {
+void raw_ostream::writeSlow(unsigned char C) {
   // Group exceptional cases into a single branch.
   if (LLVM_UNLIKELY(OutBufCur >= OutBufEnd)) {
     if (LLVM_UNLIKELY(!OutBufStart)) {
       if (BufferMode == BufferKind::Unbuffered) {
         write_impl(reinterpret_cast<char *>(&C), 1);
-        return *this;
+        return;
       }
       // Set up a buffer and start over.
       SetBuffered();
-      return write(C);
+      write(C);
+      return;
     }
 
     flush_nonempty();
   }
 
   *OutBufCur++ = C;
-  return *this;
 }
 
-raw_ostream &raw_ostream::write(const char *Ptr, size_t Size) {
+void raw_ostream::writeSlow(const char *Ptr, size_t Size) {
   // Group exceptional cases into a single branch.
   if (LLVM_UNLIKELY(size_t(OutBufEnd - OutBufCur) < Size)) {
     if (LLVM_UNLIKELY(!OutBufStart)) {
       if (BufferMode == BufferKind::Unbuffered) {
         write_impl(Ptr, Size);
-        return *this;
+        return;
       }
       // Set up a buffer and start over.
       SetBuffered();
-      return write(Ptr, Size);
+      write(Ptr, Size);
+      return;
     }
 
     size_t NumBytes = OutBufEnd - OutBufCur;
@@ -269,22 +270,22 @@ raw_ostream &raw_ostream::write(const char *Ptr, size_t Size) {
       size_t BytesRemaining = Size - BytesToWrite;
       if (BytesRemaining > size_t(OutBufEnd - OutBufCur)) {
         // Too much left over to copy into our buffer.
-        return write(Ptr + BytesToWrite, BytesRemaining);
+        write(Ptr + BytesToWrite, BytesRemaining);
+        return;
       }
       copy_to_buffer(Ptr + BytesToWrite, BytesRemaining);
-      return *this;
+      return;
     }
 
     // We don't have enough space in the buffer to fit the string in. Insert as
     // much as possible, flush and start over with the remainder.
     copy_to_buffer(Ptr, NumBytes);
     flush_nonempty();
-    return write(Ptr + NumBytes, Size - NumBytes);
+    write(Ptr + NumBytes, Size - NumBytes);
+    return;
   }
 
   copy_to_buffer(Ptr, Size);
-
-  return *this;
 }
 
 void raw_ostream::copy_to_buffer(const char *Ptr, size_t Size) {

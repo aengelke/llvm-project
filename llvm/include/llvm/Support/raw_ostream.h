@@ -226,8 +226,10 @@ public:
     size_t Size = Str.size();
 
     // Make sure we can use the fast path.
-    if (Size > (size_t)(OutBufEnd - OutBufCur))
-      return write(Str.data(), Size);
+    if (Size > (size_t)(OutBufEnd - OutBufCur)) {
+      write(Str.data(), Size);
+      return *this;
+    }
 
     if (Size) {
       memcpy(OutBufCur, Str.data(), Size);
@@ -259,15 +261,18 @@ public:
 
   raw_ostream &operator<<(const std::string &Str) {
     // Avoid the fast path, it would only increase code size for a marginal win.
-    return write(Str.data(), Str.length());
+    write(Str.data(), Str.length());
+    return *this;
   }
 
   raw_ostream &operator<<(const std::string_view &Str) {
-    return write(Str.data(), Str.length());
+    write(Str.data(), Str.length());
+    return *this;
   }
 
   raw_ostream &operator<<(const SmallVectorImpl<char> &Str) {
-    return write(Str.data(), Str.size());
+    write(Str.data(), Str.size());
+    return *this;
   }
 
   raw_ostream &operator<<(unsigned long N);
@@ -301,7 +306,15 @@ public:
   raw_ostream &write_escaped(StringRef Str, bool UseHexEscapes = false);
 
   raw_ostream &write(unsigned char C);
-  raw_ostream &write(const char *Ptr, size_t Size);
+  void write(const char *Ptr, size_t Size) {
+    if (LLVM_UNLIKELY(size_t(OutBufEnd - OutBufCur) < Size)) {
+      writeSlow(Ptr, Size);
+    } else {
+      memcpy(OutBufCur, Ptr, Size);
+      OutBufCur += Size;
+    }
+    // return *this;
+  }
 
   // Formatted output, see the format() function in Support/Format.h.
   raw_ostream &operator<<(const format_object_base &Fmt);
@@ -405,6 +418,9 @@ private:
   /// Flush the current buffer, which is known to be non-empty. This outputs the
   /// currently buffered data and resets the buffer to empty.
   void flush_nonempty();
+
+  /// Slow path for writing when buffer is too small.
+  void writeSlow(const char *Ptr, size_t Size);
 
   /// Copy data into the buffer. Size must not be greater than the number of
   /// unused bytes in the buffer.

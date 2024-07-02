@@ -275,6 +275,7 @@ public:
   void setFragment(MCFragment *F) const {
     assert(!isVariable() && "Cannot set fragment of variable");
     Fragment = F;
+    F->setHasSymbol();
   }
 
   /// Mark the symbol as undefined.

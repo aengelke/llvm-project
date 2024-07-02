@@ -71,6 +71,7 @@ private:
 
 protected:
   bool HasInstructions : 1;
+  bool HasSymbol : 1;
   bool LinkerRelaxable : 1;
 
   MCFragment(FragmentType Kind, bool HasInstructions);
@@ -101,6 +102,9 @@ public:
   /// Does this fragment have instructions emitted into it? By default
   /// this is false, but specific fragment types may set it to true.
   bool hasInstructions() const { return HasInstructions; }
+
+  void setHasSymbol() { HasSymbol = true; }
+  bool hasSymbol() const { return HasSymbol; }
 
   void dump() const;
 };

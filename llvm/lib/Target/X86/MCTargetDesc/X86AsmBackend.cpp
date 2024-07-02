@@ -866,13 +866,6 @@ void X86AsmBackend::finishLayout(MCAssembler const &Asm) const {
   if (!X86PadForAlign && !X86PadForBranchAlign)
     return;
 
-  // The processed regions are delimitered by LabeledFragments. -g may have more
-  // MCSymbols and therefore different relaxation results. X86PadForAlign is
-  // disabled by default to eliminate the -g vs non -g difference.
-  DenseSet<MCFragment *> LabeledFragments;
-  for (const MCSymbol &S : Asm.symbols())
-    LabeledFragments.insert(S.getFragment(false));
-
   for (MCSection &Sec : Asm) {
     if (!Sec.isText())
       continue;
@@ -881,7 +874,11 @@ void X86AsmBackend::finishLayout(MCAssembler const &Asm) const {
     for (MCSection::iterator I = Sec.begin(), IE = Sec.end(); I != IE; ++I) {
       MCFragment &F = *I;
 
-      if (LabeledFragments.count(&F))
+      // The processed regions are delimitered by LabeledFragments. -g may have
+      // more MCSymbols and therefore different relaxation results.
+      // X86PadForAlign is disabled by default to eliminate the -g vs non -g
+      // difference.
+      if (F.hasSymbol())
         Relaxable.clear();
 
       if (F.getKind() == MCFragment::FT_Data ||

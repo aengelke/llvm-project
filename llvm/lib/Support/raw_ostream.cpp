@@ -97,31 +97,13 @@ size_t raw_ostream::preferred_buffer_size() const {
 }
 
 void raw_ostream::SetBuffered() {
+  assert(BufferMode != BufferKind::ExternalBuffer);
   // Ask the subclass to determine an appropriate buffer size.
   if (size_t Size = preferred_buffer_size())
     SetBufferSize(Size);
   else
     // It may return 0, meaning this stream should be unbuffered.
     SetUnbuffered();
-}
-
-void raw_ostream::SetBufferAndMode(char *BufferStart, size_t Size,
-                                   BufferKind Mode) {
-  assert(((Mode == BufferKind::Unbuffered && !BufferStart && Size == 0) ||
-          (Mode != BufferKind::Unbuffered && BufferStart && Size != 0)) &&
-         "stream must be unbuffered or have at least one byte");
-  // Make sure the current buffer is free of content (we can't flush here; the
-  // child buffer management logic will be in write_impl).
-  assert(GetNumBytesInBuffer() == 0 && "Current buffer is non-empty!");
-
-  if (BufferMode == BufferKind::InternalBuffer)
-    delete [] OutBufStart;
-  OutBufStart = BufferStart;
-  OutBufEnd = OutBufStart+Size;
-  OutBufCur = OutBufStart;
-  BufferMode = Mode;
-
-  assert(OutBufStart <= OutBufEnd && "Invalid size!");
 }
 
 raw_ostream &raw_ostream::operator<<(unsigned long N) {
@@ -215,13 +197,6 @@ raw_ostream &raw_ostream::operator<<(const void *P) {
 raw_ostream &raw_ostream::operator<<(double N) {
   llvm::write_double(*this, N, FloatStyle::Exponent);
   return *this;
-}
-
-void raw_ostream::flush_nonempty() {
-  assert(OutBufCur > OutBufStart && "Invalid call to flush_nonempty.");
-  size_t Length = OutBufCur - OutBufStart;
-  OutBufCur = OutBufStart;
-  write_impl(OutBufStart, Length);
 }
 
 void raw_ostream::writeSlow(unsigned char C) {

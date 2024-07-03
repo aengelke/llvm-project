@@ -800,7 +800,7 @@ public:
     updateBuffer();
   }
 
-  ~buffered_svector_ostream() override { OS.truncate(tell()); }
+  ~buffered_svector_ostream() override { flush(); OS.truncate(tell()); }
 
   /// Return a StringRef for the vector contents.
   StringRef str() const { return StringRef(OS.data(), tell()); }

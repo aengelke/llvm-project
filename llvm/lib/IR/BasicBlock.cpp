@@ -240,6 +240,9 @@ BasicBlock::~BasicBlock() {
 
 void BasicBlock::setParent(Function *parent) {
   // Set Parent=parent, updating instruction symtab entries as appropriate.
+  if (parent && Parent != parent)
+    Number = parent->NextBlockNum++; // don't set to -1 for no parent, dom tree
+                                     // deletion still needs the number
   InstList.setSymTabObject(&Parent, parent);
 }
 

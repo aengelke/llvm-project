@@ -3629,7 +3629,8 @@ void MachineBlockPlacement::applyExtTsp() {
 void MachineBlockPlacement::assignBlockOrder(
     const std::vector<const MachineBasicBlock *> &NewBlockOrder) {
   assert(F->size() == NewBlockOrder.size() && "Incorrect size of block order");
-  F->RenumberBlocks();
+  // F->RenumberBlocks(); XXX invalides MDPT, not sure if this is needed after
+  // this
 
   bool HasChanges = false;
   for (size_t I = 0; I < NewBlockOrder.size(); I++) {

@@ -397,7 +397,7 @@ bool BasicBlockSections::runOnMachineFunction(MachineFunction &MF) {
 }
 
 void BasicBlockSections::getAnalysisUsage(AnalysisUsage &AU) const {
-  AU.setPreservesAll();
+  // AU.setPreservesAll(); XXX doesn't preserve dom tree due to renumbering
   AU.addRequired<BasicBlockSectionsProfileReaderWrapperPass>();
   MachineFunctionPass::getAnalysisUsage(AU);
 }

@@ -142,7 +142,7 @@ void ilist_callback_traits<MachineBasicBlock>::addNodeToList(
 void ilist_callback_traits<MachineBasicBlock>::removeNodeFromList(
     MachineBasicBlock *N) {
   N->getParent()->removeFromMBBNumbering(N->Number);
-  N->Number = -1;
+  // N->Number = -1; XXX dom tree update needs number
 }
 
 /// When we add an instruction to a basic block list, we update its parent

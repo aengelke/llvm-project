@@ -67,6 +67,9 @@ public:
   bool IsNewDbgInfoFormat;
 
 private:
+  /// Per-function unique number.
+  int Number = -1;
+
   friend class BlockAddress;
   friend class SymbolTableListTraits<BasicBlock>;
 
@@ -95,6 +98,9 @@ public:
   /// if necessary.
   void setIsNewDbgInfoFormat(bool NewFlag);
   void setNewDbgInfoFormatFlag(bool NewFlag);
+
+  int getNumber() const { return Number; }
+  void setNumber(int Num) { Number = Num; }
 
   /// Record that the collection of DbgRecords in \p M "trails" after the last
   /// instruction of this block. These are equivalent to dbg.value intrinsics

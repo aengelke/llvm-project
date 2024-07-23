@@ -263,8 +263,10 @@ protected:
   SmallVector<NodeT *, IsPostDom ? 4 : 1> Roots;
 
   using DomTreeNodeMapType =
-     DenseMap<NodeT *, std::unique_ptr<DomTreeNodeBase<NodeT>>>;
+      SmallVector<std::unique_ptr<DomTreeNodeBase<NodeT>>>;
   DomTreeNodeMapType DomTreeNodes;
+  /// Map from NodeT to index in DomTreeNodes for graphs without hasNumbers()
+  mutable DenseMap<const NodeT *, unsigned> NodeNumberMap;
   DomTreeNodeBase<NodeT> *RootNode = nullptr;
   ParentPtr Parent = nullptr;
 
@@ -338,22 +340,24 @@ protected:
       return true;
 
     const DomTreeNodeMapType &OtherDomTreeNodes = Other.DomTreeNodes;
-    if (DomTreeNodes.size() != OtherDomTreeNodes.size())
-      return true;
+    unsigned Lim = DomTreeNodes.size();
+    if (Lim > OtherDomTreeNodes.size())
+      Lim = OtherDomTreeNodes.size();
 
-    for (const auto &DomTreeNode : DomTreeNodes) {
-      NodeT *BB = DomTreeNode.first;
-      typename DomTreeNodeMapType::const_iterator OI =
-          OtherDomTreeNodes.find(BB);
-      if (OI == OtherDomTreeNodes.end())
+    for (size_t i = 0; i < Lim; i++) {
+      if (!!DomTreeNodes[i] != !!Other.DomTreeNodes[i])
         return true;
-
-      DomTreeNodeBase<NodeT> &MyNd = *DomTreeNode.second;
-      DomTreeNodeBase<NodeT> &OtherNd = *OI->second;
-
-      if (MyNd.compare(&OtherNd))
+      if (DomTreeNodes[i] &&
+          DomTreeNodes[i]->compare(OtherDomTreeNodes[i].get()))
         return true;
     }
+
+    for (size_t i = Lim; i < DomTreeNodes.size(); i++)
+      if (DomTreeNodes[i])
+        return true;
+    for (size_t i = Lim; i < OtherDomTreeNodes.size(); i++)
+      if (OtherDomTreeNodes[i])
+        return true;
 
     return false;
   }
@@ -363,9 +367,8 @@ protected:
   /// may (but is not required to) be null for a forward (backwards)
   /// statically unreachable block.
   DomTreeNodeBase<NodeT> *getNode(const NodeT *BB) const {
-    auto I = DomTreeNodes.find(BB);
-    if (I != DomTreeNodes.end())
-      return I->second.get();
+    if (unsigned Idx = getNodeIndex(BB); Idx < DomTreeNodes.size())
+      return DomTreeNodes[Idx].get();
     return nullptr;
   }
 
@@ -655,8 +658,8 @@ protected:
     } else {
       assert(Roots.size() == 1);
       NodeT *OldRoot = Roots.front();
-      auto &OldNode = DomTreeNodes[OldRoot];
-      OldNode = NewNode->addChild(std::move(DomTreeNodes[OldRoot]));
+      auto &OldNode = getNodePtr(OldRoot);
+      OldNode = NewNode->addChild(std::move(OldNode));
       OldNode->IDom = NewNode;
       OldNode->UpdateLevel();
       Roots[0] = BB;
@@ -698,7 +701,7 @@ protected:
       IDom->Children.erase(I);
     }
 
-    DomTreeNodes.erase(BB);
+    getNodePtr(BB) = nullptr;
 
     if (!IsPostDom) return;
 
@@ -830,14 +833,39 @@ public:
 protected:
   void addRoot(NodeT *BB) { this->Roots.push_back(BB); }
 
+  template <typename T>
+  using has_number_t =
+      decltype(GraphTraits<T *>::getNumber(std::declval<T *>()));
+
+  template <class T_ = NodeT>
+  std::enable_if_t<is_detected<has_number_t, T_>::value, unsigned>
+  getNodeIndex(const NodeT *BB) const {
+    if (!BB)
+      return 0;
+    return GraphTraits<const NodeT *>::getNumber(BB) + 1;
+  }
+
+  template <class T_ = NodeT>
+  std::enable_if_t<!is_detected<has_number_t, T_>::value, unsigned>
+  getNodeIndex(const NodeT *BB) const {
+    return NodeNumberMap.try_emplace(BB, NodeNumberMap.size()).first->second;
+  }
+
+  std::unique_ptr<DomTreeNodeBase<NodeT>> &getNodePtr(NodeT *BB) {
+    unsigned Num = getNodeIndex(BB);
+    if (DomTreeNodes.size() <= Num)
+      DomTreeNodes.resize(Num + 1);
+    return DomTreeNodes[Num];
+  }
+
   DomTreeNodeBase<NodeT> *createChild(NodeT *BB, DomTreeNodeBase<NodeT> *IDom) {
-    return (DomTreeNodes[BB] = IDom->addChild(
+    return (getNodePtr(BB) = IDom->addChild(
                 std::make_unique<DomTreeNodeBase<NodeT>>(BB, IDom)))
         .get();
   }
 
   DomTreeNodeBase<NodeT> *createNode(NodeT *BB) {
-    return (DomTreeNodes[BB] =
+    return (getNodePtr(BB) =
                 std::make_unique<DomTreeNodeBase<NodeT>>(BB, nullptr))
         .get();
   }

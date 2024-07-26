@@ -723,14 +723,10 @@ void SSAIfConv::convertIf(SmallVectorImpl<MachineBasicBlock *> &RemovedBlocks,
 
   // Erase the now empty conditional blocks. It is likely that Head can fall
   // through to Tail, and we can join the two blocks.
-  if (TBB != Tail) {
+  if (TBB != Tail)
     RemovedBlocks.push_back(TBB);
-    TBB->eraseFromParent();
-  }
-  if (FBB != Tail) {
+  if (FBB != Tail)
     RemovedBlocks.push_back(FBB);
-    FBB->eraseFromParent();
-  }
 
   assert(Head->succ_empty() && "Additional head successors?");
   if (!ExtraPreds && Head->isLayoutSuccessor(Tail)) {
@@ -741,7 +737,6 @@ void SSAIfConv::convertIf(SmallVectorImpl<MachineBasicBlock *> &RemovedBlocks,
                      Tail->begin(), Tail->end());
     Head->transferSuccessorsAndUpdatePHIs(Tail);
     RemovedBlocks.push_back(Tail);
-    Tail->eraseFromParent();
   } else {
     // We need a branch to Tail, let code placement work it out later.
     LLVM_DEBUG(dbgs() << "Converting to unconditional branch.\n");
@@ -1066,6 +1061,8 @@ bool EarlyIfConverter::tryConvertIf(MachineBasicBlock *MBB) {
     IfConv.convertIf(RemovedBlocks);
     Changed = true;
     updateDomTree(DomTree, IfConv, RemovedBlocks);
+    for (MachineBasicBlock *MBB : RemovedBlocks)
+      MBB->eraseFromParent();
     updateLoops(Loops, RemovedBlocks);
   }
   return Changed;

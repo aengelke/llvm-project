@@ -75,6 +75,10 @@ public:
 private:
   // Important things that make up a function!
   BasicBlockListType BasicBlocks;         ///< The basic blocks
+public:
+  int NextBlockNum = 0;
+
+private:
   mutable Argument *Arguments = nullptr;  ///< The formal arguments
   size_t NumArgs;
   std::unique_ptr<ValueSymbolTable>

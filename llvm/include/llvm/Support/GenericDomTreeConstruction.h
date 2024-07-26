@@ -137,7 +137,7 @@ struct SemiNCAInfo {
     // immediate dominator.
     NodePtr IDom = getIDom(BB);
 
-    assert(IDom || DT.DomTreeNodes[nullptr]);
+    assert(IDom || DT.getNode(nullptr));
     TreeNodePtr IDomNode = getNodeForBlock(IDom, DT);
 
     // Add a new tree node for this NodeT, and link it as a child of
@@ -586,7 +586,8 @@ struct SemiNCAInfo {
     // Loop over all of the discovered blocks in the function...
     for (NodePtr W : llvm::drop_begin(NumToNode)) {
       // Don't replace this with 'count', the insertion side effect is important
-      if (DT.DomTreeNodes[W]) continue;  // Haven't calculated this node yet?
+      if (DT.getNode(W))
+        continue; // Haven't calculated this node yet?
 
       NodePtr ImmDom = getIDom(W);
 
@@ -1078,10 +1079,9 @@ struct SemiNCAInfo {
     // before deleting their parent.
     for (unsigned i = LastDFSNum; i > 0; --i) {
       const NodePtr N = SNCA.NumToNode[i];
-      const TreeNodePtr TN = DT.getNode(N);
-      LLVM_DEBUG(dbgs() << "Erasing node " << BlockNamePrinter(TN) << "\n");
-
-      EraseNode(DT, TN);
+      LLVM_DEBUG(dbgs() << "Erasing node " << BlockNamePrinter(DT.getNode(N))
+                        << "\n");
+      DT.eraseNode(N);
     }
 
     // The affected subtree start at the To node -- there's no extra work to do.
@@ -1107,22 +1107,6 @@ struct SemiNCAInfo {
     // Rebuild the remaining part of affected subtree.
     SNCA.runSemiNCA();
     SNCA.reattachExistingSubtree(DT, PrevIDom);
-  }
-
-  // Removes leaf tree nodes from the dominator tree.
-  static void EraseNode(DomTreeT &DT, const TreeNodePtr TN) {
-    assert(TN);
-    assert(TN->getNumChildren() == 0 && "Not a tree leaf");
-
-    const TreeNodePtr IDom = TN->getIDom();
-    assert(IDom);
-
-    auto ChIt = llvm::find(IDom->Children, TN);
-    assert(ChIt != IDom->Children.end());
-    std::swap(*ChIt, IDom->Children.back());
-    IDom->Children.pop_back();
-
-    DT.DomTreeNodes.erase(TN->getBlock());
   }
 
   //~~
@@ -1248,7 +1232,9 @@ struct SemiNCAInfo {
     doFullDFSWalk(DT, AlwaysDescend);
 
     for (auto &NodeToTN : DT.DomTreeNodes) {
-      const TreeNodePtr TN = NodeToTN.second.get();
+      const TreeNodePtr TN = NodeToTN.get();
+      if (!TN)
+        continue;
       const NodePtr BB = TN->getBlock();
 
       // Virtual root has a corresponding virtual CFG node.
@@ -1281,7 +1267,9 @@ struct SemiNCAInfo {
   // Running time: O(N).
   static bool VerifyLevels(const DomTreeT &DT) {
     for (auto &NodeToTN : DT.DomTreeNodes) {
-      const TreeNodePtr TN = NodeToTN.second.get();
+      const TreeNodePtr TN = NodeToTN.get();
+      if (!TN)
+        continue;
       const NodePtr BB = TN->getBlock();
       if (!BB) continue;
 
@@ -1336,7 +1324,9 @@ struct SemiNCAInfo {
     // For each tree node verify if children's DFS numbers cover their parent's
     // DFS numbers with no gaps.
     for (const auto &NodeToTN : DT.DomTreeNodes) {
-      const TreeNodePtr Node = NodeToTN.second.get();
+      const TreeNodePtr Node = NodeToTN.get();
+      if (!Node)
+        continue;
 
       // Handle tree leaves.
       if (Node->isLeaf()) {
@@ -1449,7 +1439,9 @@ struct SemiNCAInfo {
   // the nodes it dominated previously will now become unreachable.
   bool verifyParentProperty(const DomTreeT &DT) {
     for (auto &NodeToTN : DT.DomTreeNodes) {
-      const TreeNodePtr TN = NodeToTN.second.get();
+      const TreeNodePtr TN = NodeToTN.get();
+      if (!TN)
+        continue;
       const NodePtr BB = TN->getBlock();
       if (!BB || TN->isLeaf())
         continue;
@@ -1483,7 +1475,9 @@ struct SemiNCAInfo {
   // siblings will now still be reachable.
   bool verifySiblingProperty(const DomTreeT &DT) {
     for (auto &NodeToTN : DT.DomTreeNodes) {
-      const TreeNodePtr TN = NodeToTN.second.get();
+      const TreeNodePtr TN = NodeToTN.get();
+      if (!TN)
+        continue;
       const NodePtr BB = TN->getBlock();
       if (!BB || TN->isLeaf())
         continue;

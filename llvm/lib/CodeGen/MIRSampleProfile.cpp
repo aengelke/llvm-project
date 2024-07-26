@@ -400,7 +400,8 @@ bool MIRProfileLoaderPass::doInitialization(Module &M) {
 }
 
 void MIRProfileLoaderPass::getAnalysisUsage(AnalysisUsage &AU) const {
-  AU.setPreservesAll();
+  // XXX renumbering invalidates dom trees
+  // AU.setPreservesAll();
   AU.addRequired<MachineBlockFrequencyInfoWrapperPass>();
   AU.addRequired<MachineDominatorTreeWrapperPass>();
   AU.addRequired<MachinePostDominatorTreeWrapperPass>();

@@ -2923,6 +2923,19 @@ void Verifier::visitFunction(const Function &F) {
             "blockaddress may not be used with the entry block!", Entry);
     }
 
+    // Verify that block numbers are unique
+    BitVector BlockNumbers;
+    for (const auto &BB : F) {
+      int Num = BB.getNumber();
+      Check(Num >= 0, "block has negative number", BB);
+      if (Num >= 0) {
+        if (BlockNumbers.size() <= Num)
+          BlockNumbers.resize(Num + 1);
+        Check(!BlockNumbers[Num], "duplicate block numbers", BB);
+        BlockNumbers.set(Num);
+      }
+    }
+
     unsigned NumDebugAttachments = 0, NumProfAttachments = 0,
              NumKCFIAttachments = 0;
     // Visit metadata attachments.

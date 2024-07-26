@@ -304,6 +304,8 @@ template <> struct GraphTraits<BasicBlock*> {
   static NodeRef getEntryNode(BasicBlock *BB) { return BB; }
   static ChildIteratorType child_begin(NodeRef N) { return succ_begin(N); }
   static ChildIteratorType child_end(NodeRef N) { return succ_end(N); }
+
+  static int getNumber(BasicBlock *BB) { return BB->getNumber(); }
 };
 
 template <> struct GraphTraits<const BasicBlock*> {
@@ -314,6 +316,8 @@ template <> struct GraphTraits<const BasicBlock*> {
 
   static ChildIteratorType child_begin(NodeRef N) { return succ_begin(N); }
   static ChildIteratorType child_end(NodeRef N) { return succ_end(N); }
+
+  static int getNumber(const BasicBlock *BB) { return BB->getNumber(); }
 };
 
 // Provide specializations of GraphTraits to be able to treat a function as a
@@ -328,6 +332,8 @@ template <> struct GraphTraits<Inverse<BasicBlock*>> {
   static NodeRef getEntryNode(Inverse<BasicBlock *> G) { return G.Graph; }
   static ChildIteratorType child_begin(NodeRef N) { return pred_begin(N); }
   static ChildIteratorType child_end(NodeRef N) { return pred_end(N); }
+
+  static int getNumber(BasicBlock *BB) { return BB->getNumber(); }
 };
 
 template <> struct GraphTraits<Inverse<const BasicBlock*>> {
@@ -337,6 +343,8 @@ template <> struct GraphTraits<Inverse<const BasicBlock*>> {
   static NodeRef getEntryNode(Inverse<const BasicBlock *> G) { return G.Graph; }
   static ChildIteratorType child_begin(NodeRef N) { return pred_begin(N); }
   static ChildIteratorType child_end(NodeRef N) { return pred_end(N); }
+
+  static int getNumber(const BasicBlock *BB) { return BB->getNumber(); }
 };
 
 //===--------------------------------------------------------------------===//

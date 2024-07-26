@@ -211,7 +211,7 @@ bool PHIEliminationImpl::run(MachineFunction &MF) {
     // efficiently also with large functions.
     std::vector<SparseBitVector<>> LiveInSets;
     if (LV) {
-      LiveInSets.resize(MF.size());
+      LiveInSets.resize(MF.getNumBlockIDs());
       for (unsigned Index = 0, e = MRI->getNumVirtRegs(); Index != e; ++Index) {
         // Set the bit for this register for each MBB where it is
         // live-through or live-in (killed).

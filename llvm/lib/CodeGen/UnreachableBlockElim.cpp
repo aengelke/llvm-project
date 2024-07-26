@@ -90,7 +90,8 @@ char &llvm::UnreachableMachineBlockElimID = UnreachableMachineBlockElim::ID;
 
 void UnreachableMachineBlockElim::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addPreserved<MachineLoopInfoWrapperPass>();
-  AU.addPreserved<MachineDominatorTreeWrapperPass>();
+  // AU.addPreserved<MachineDominatorTreeWrapperPass>(); XXX invalidated by
+  // renumbering
   MachineFunctionPass::getAnalysisUsage(AU);
 }
 

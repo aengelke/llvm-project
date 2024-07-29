@@ -144,6 +144,10 @@ bool DominatorTree::dominates(const Value *DefV,
   const BasicBlock *UseBB = User->getParent();
   const BasicBlock *DefBB = Def->getParent();
 
+  // Basic blocks from different functions can't dominate each other.
+  if (DefBB->getParent() != UseBB->getParent())
+    return false;
+
   // Any unreachable use is dominated, even if Def == User.
   if (!isReachableFromEntry(UseBB))
     return true;
@@ -174,6 +178,10 @@ bool DominatorTree::dominates(const Value *DefV,
 bool DominatorTree::dominates(const Instruction *Def,
                               const BasicBlock *UseBB) const {
   const BasicBlock *DefBB = Def->getParent();
+
+  // Basic blocks from different functions can't dominate each other.
+  if (DefBB->getParent() != UseBB->getParent())
+    return false;
 
   // Any unreachable use is dominated, even if DefBB == UseBB.
   if (!isReachableFromEntry(UseBB))
@@ -284,6 +292,10 @@ bool DominatorTree::dominates(const Value *DefV, const Use &U) const {
     UseBB = PN->getIncomingBlock(U);
   else
     UseBB = UserInst->getParent();
+
+  // Basic blocks from different functions can't dominate each other.
+  if (DefBB->getParent() != UseBB->getParent())
+    return false;
 
   // Any unreachable use is dominated, even if Def == User.
   if (!isReachableFromEntry(UseBB))

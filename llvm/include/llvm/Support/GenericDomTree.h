@@ -359,6 +359,10 @@ private:
   std::enable_if_t<is_detected<has_number_t, T_>::value,
                    std::optional<unsigned>>
   getNodeIndex(const NodeT *BB) const {
+    // XXX temporary check, because blocks in different functions can have the
+    // same numbers -- previously, this was well-defined.
+    if (BB && !Roots.empty())
+      assert(BB->getParent() == Roots[0]->getParent());
     // BB can be nullptr, map nullptr to index 0.
     return BB ? BB->getNumber() + 1 : 0;
   }

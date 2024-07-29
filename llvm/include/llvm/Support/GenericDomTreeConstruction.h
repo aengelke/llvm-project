@@ -137,7 +137,7 @@ struct SemiNCAInfo {
     // immediate dominator.
     NodePtr IDom = getIDom(BB);
 
-    assert(IDom || DT.DomTreeNodes[nullptr]);
+    assert(IDom || DT.getNode(nullptr));
     TreeNodePtr IDomNode = getNodeForBlock(IDom, DT);
 
     // Add a new tree node for this NodeT, and link it as a child of
@@ -586,7 +586,8 @@ struct SemiNCAInfo {
     // Loop over all of the discovered blocks in the function...
     for (NodePtr W : llvm::drop_begin(NumToNode)) {
       // Don't replace this with 'count', the insertion side effect is important
-      if (DT.DomTreeNodes[W]) continue;  // Haven't calculated this node yet?
+      if (DT.getNode(W))
+        continue; // Haven't calculated this node yet?
 
       NodePtr ImmDom = getIDom(W);
 

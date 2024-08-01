@@ -62,7 +62,7 @@ struct SemiNCAInfo {
 
   template <typename T>
   using has_number_t =
-      decltype(GraphTraits<T *>::getNumber(std::declval<T *>()));
+      decltype(GraphTraits<T *>::getNumberXXX(std::declval<T *>()));
 
   // Information record used by Semi-NCA during tree construction.
   struct InfoRec {

@@ -384,8 +384,10 @@ private:
   getNodeIndexForInsert(const NodeT *BB) {
     // getNodeIndex will never fail if nodes have getNumber().
     unsigned Idx = *getNodeIndex(BB);
-    if (Idx >= DomTreeNodes.size())
-      DomTreeNodes.resize(Idx + 1);
+    if (Idx >= DomTreeNodes.size()) {
+      unsigned Max = GraphTraits<ParentPtr>::getMaxNumber(Parent);
+      DomTreeNodes.resize(Max > Idx + 1 ? Max : Idx + 1);
+    }
     return Idx;
   }
 

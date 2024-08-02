@@ -808,13 +808,6 @@ void PMTopLevelManager::addImmutablePass(ImmutablePass *P) {
   // doing lookups.
   AnalysisID AID = P->getPassID();
   ImmutablePassMap[AID] = P;
-
-  // Also add any interfaces implemented by the immutable pass to the map for
-  // fast lookup.
-  const PassInfo *PassInf = findAnalysisPassInfo(AID);
-  assert(PassInf && "Expected all immutable passes to be initialized");
-  for (const PassInfo *ImmPI : PassInf->getInterfacesImplemented())
-    ImmutablePassMap[ImmPI->getTypeInfo()] = P;
 }
 
 // Print passes managed by this top level manager.
@@ -878,15 +871,6 @@ void PMDataManager::recordAvailableAnalysis(Pass *P) {
   AnalysisID PI = P->getPassID();
 
   AvailableAnalysis[PI] = P;
-
-  assert(!AvailableAnalysis.empty());
-
-  // This pass is the current implementation of all of the interfaces it
-  // implements as well.
-  const PassInfo *PInf = TPM->findAnalysisPassInfo(PI);
-  if (!PInf) return;
-  for (const PassInfo *PI : PInf->getInterfacesImplemented())
-    AvailableAnalysis[PI->getTypeInfo()] = P;
 }
 
 // Return true if P preserves high level analysis used by other
@@ -1004,20 +988,8 @@ void PMDataManager::freePass(Pass *P, StringRef Msg,
     P->releaseMemory();
   }
 
-  AnalysisID PI = P->getPassID();
-  if (const PassInfo *PInf = TPM->findAnalysisPassInfo(PI)) {
-    // Remove the pass itself (if it is not already removed).
-    AvailableAnalysis.erase(PI);
-
-    // Remove all interfaces this pass implements, for which it is also
-    // listed as the available implementation.
-    for (const PassInfo *PI : PInf->getInterfacesImplemented()) {
-      DenseMap<AnalysisID, Pass *>::iterator Pos =
-          AvailableAnalysis.find(PI->getTypeInfo());
-      if (Pos != AvailableAnalysis.end() && Pos->second == P)
-        AvailableAnalysis.erase(Pos);
-    }
-  }
+  // Remove the pass itself (if it is not already removed).
+  AvailableAnalysis.erase(P->getPassID());
 }
 
 /// Add pass P into the PassVector. Update

@@ -14,7 +14,7 @@
 #define LLVM_IR_PREDITERATORCACHE_H
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/Support/Allocator.h"
@@ -27,6 +27,8 @@ namespace llvm {
 class PredIteratorCache {
   /// Storage, indexed by block number.
   SmallVector<ArrayRef<BasicBlock *>> Storage;
+  /// Whether storage is valid, indexed by block number.
+  BitVector StorageValid;
   /// Block number epoch to guard against renumberings.
   unsigned BlockNumberEpoch;
 
@@ -38,29 +40,33 @@ public:
   ArrayRef<BasicBlock *> get(BasicBlock *BB) {
 #ifndef NDEBUG
     // In debug builds, verify that no renumbering has occured.
-    if (Storage.empty())
+    if (StorageValid.empty())
       BlockNumberEpoch = BB->getParent()->getBlockNumberEpoch();
     else
       assert(BlockNumberEpoch == BB->getParent()->getBlockNumberEpoch() &&
              "Blocks renumbered during lifetime of PredIteratorCache");
 #endif
 
-    if (LLVM_LIKELY(BB->getNumber() < Storage.size()))
-      if (auto Res = Storage[BB->getNumber()]; Res.data())
-        return Res;
+    if (LLVM_LIKELY(BB->getNumber() < StorageValid.size()))
+      if (StorageValid[BB->getNumber()])
+        return Storage[BB->getNumber()];
 
-    if (BB->getNumber() >= Storage.size())
-      Storage.resize(BB->getParent()->getMaxBlockNumber());
+    if (BB->getNumber() >= StorageValid.size()) {
+      StorageValid.resize(BB->getParent()->getMaxBlockNumber());
+      // Don't initialize memory for performance
+      Storage.resize_for_overwrite(BB->getParent()->getMaxBlockNumber());
+    }
 
     SmallVector<BasicBlock *, 32> PredCache(predecessors(BB));
     BasicBlock **Data = Memory.Allocate<BasicBlock *>(PredCache.size());
     std::copy(PredCache.begin(), PredCache.end(), Data);
+    StorageValid[BB->getNumber()] = true;
     return Storage[BB->getNumber()] = ArrayRef(Data, PredCache.size());
   }
 
   /// clear - Remove all information.
   void clear() {
-    Storage.clear();
+    StorageValid.clear();
     Memory.Reset();
   }
 };

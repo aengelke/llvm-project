@@ -405,9 +405,13 @@ static unsigned convertTailJumpOpcode(unsigned Opcode) {
 void X86MCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
   OutMI.setOpcode(MI->getOpcode());
 
-  for (const MachineOperand &MO : MI->operands())
+  for (const MachineOperand &MO : MI->operands()) {
+    // Implicit operands come last and are always ignored.
+    if (MO.isReg() && MO.isImplicit())
+      break;
     if (auto Op = LowerMachineOperand(MI, MO); Op.isValid())
       OutMI.addOperand(Op);
+  }
 
   bool In64BitMode = AsmPrinter.getSubtarget().is64Bit();
   if (X86::optimizeInstFromVEX3ToVEX2(OutMI, MI->getDesc()) ||

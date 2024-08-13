@@ -73,7 +73,8 @@ MCContext::MCContext(const Triple &TheTriple, const MCAsmInfo *mai,
       MAI(mai), MRI(mri), MSTI(msti), Symbols(Allocator),
       InlineAsmUsedLabelNames(Allocator),
       CurrentDwarfLoc(0, 0, 0, DWARF2_FLAG_IS_STMT, 0, 0),
-      AutoReset(DoAutoReset), TargetOptions(TargetOpts) {
+      SectionUniquingMap(Allocator), AutoReset(DoAutoReset),
+      TargetOptions(TargetOpts) {
   SaveTempLabels = TargetOptions && TargetOptions->MCSaveTempLabels;
   SecureLogFile = TargetOptions ? TargetOptions->AsSecureLogFile : "";
 
@@ -170,13 +171,10 @@ void MCContext::reset() {
   DwarfCompileUnitID = 0;
   CurrentDwarfLoc = MCDwarfLoc(0, 0, 0, DWARF2_FLAG_IS_STMT, 0, 0);
 
-  MachOUniquingMap.clear();
-  ELFUniquingMap.clear();
-  GOFFUniquingMap.clear();
+  SectionUniquingMap.clear();
   COFFUniquingMap.clear();
   WasmUniquingMap.clear();
   XCOFFUniquingMap.clear();
-  DXCUniquingMap.clear();
 
   ELFEntrySizeMap.clear();
   ELFSeenGenericMergeableSections.clear();
@@ -500,9 +498,10 @@ MCSectionMachO *MCContext::getMachOSection(StringRef Segment, StringRef Section,
          "section name cannot contain NUL");
 
   // Do the lookup, if we have a hit, return it.
-  auto R = MachOUniquingMap.try_emplace((Segment + Twine(',') + Section).str());
+  auto R =
+      SectionUniquingMap.try_emplace((Segment + Twine(',') + Section).str());
   if (!R.second)
-    return R.first->second;
+    return cast<MCSectionMachO>(R.first->second);
 
   MCSymbol *Begin = nullptr;
   if (BeginSymName)
@@ -584,7 +583,7 @@ MCSectionELF *MCContext::getELFSection(const Twine &Section, unsigned Type,
   // unique_id, link_to_symbol_name). Sections sharing the same quadruple are
   // combined into one section. As an optimization, non-unique sections without
   // group or linked-to symbol have a shorter unique-ing key.
-  std::pair<StringMap<MCSectionELF *>::iterator, bool> EntryNewPair;
+  std::pair<StringMap<MCSection *>::iterator, bool> EntryNewPair;
   // Length of the section name, which are the first SectionLen bytes of the key
   unsigned SectionLen;
   if (GroupSym || LinkedToSym || UniqueID != MCSection::NonUniqueID) {
@@ -599,20 +598,23 @@ MCSectionELF *MCContext::getELFSection(const Twine &Section, unsigned Type,
       Buffer.append(LinkedToSym->getName());
     support::endian::write(Buffer, UniqueID, endianness::native);
     StringRef UniqueMapKey = StringRef(Buffer);
-    EntryNewPair = ELFUniquingMap.insert(std::make_pair(UniqueMapKey, nullptr));
+    EntryNewPair =
+        SectionUniquingMap.insert(std::make_pair(UniqueMapKey, nullptr));
   } else if (!Section.isSingleStringRef()) {
     SmallString<128> Buffer;
     StringRef UniqueMapKey = Section.toStringRef(Buffer);
     SectionLen = UniqueMapKey.size();
-    EntryNewPair = ELFUniquingMap.insert(std::make_pair(UniqueMapKey, nullptr));
+    EntryNewPair =
+        SectionUniquingMap.insert(std::make_pair(UniqueMapKey, nullptr));
   } else {
     StringRef UniqueMapKey = Section.getSingleStringRef();
     SectionLen = UniqueMapKey.size();
-    EntryNewPair = ELFUniquingMap.insert(std::make_pair(UniqueMapKey, nullptr));
+    EntryNewPair =
+        SectionUniquingMap.insert(std::make_pair(UniqueMapKey, nullptr));
   }
 
   if (!EntryNewPair.second)
-    return EntryNewPair.first->second;
+    return cast<MCSectionELF>(EntryNewPair.first->second);
 
   StringRef CachedName = EntryNewPair.first->getKey().take_front(SectionLen);
 
@@ -676,13 +678,12 @@ MCSectionGOFF *MCContext::getGOFFSection(StringRef Section, SectionKind Kind,
                                          MCSection *Parent,
                                          uint32_t Subsection) {
   // Do the lookup. If we don't have a hit, return a new section.
-  auto IterBool =
-      GOFFUniquingMap.insert(std::make_pair(Section.str(), nullptr));
+  auto IterBool = SectionUniquingMap.insert(std::make_pair(Section, nullptr));
   auto Iter = IterBool.first;
   if (!IterBool.second)
-    return Iter->second;
+    return cast<MCSectionGOFF>(Iter->second);
 
-  StringRef CachedName = Iter->first;
+  StringRef CachedName = Iter->getKey();
   MCSectionGOFF *GOFFSection = new (GOFFAllocator.Allocate())
       MCSectionGOFF(CachedName, Kind, Parent, Subsection);
   Iter->second = GOFFSection;
@@ -868,21 +869,22 @@ MCSectionSPIRV *MCContext::getSPIRVSection() {
 MCSectionDXContainer *MCContext::getDXContainerSection(StringRef Section,
                                                        SectionKind K) {
   // Do the lookup, if we have a hit, return it.
-  auto ItInsertedPair = DXCUniquingMap.try_emplace(Section);
+  auto ItInsertedPair = SectionUniquingMap.try_emplace(Section);
   if (!ItInsertedPair.second)
-    return ItInsertedPair.first->second;
+    return cast<MCSectionDXContainer>(ItInsertedPair.first->second);
 
   auto MapIt = ItInsertedPair.first;
   // Grab the name from the StringMap. Since the Section is going to keep a
   // copy of this StringRef we need to make sure the underlying string stays
   // alive as long as we need it.
   StringRef Name = MapIt->first();
-  MapIt->second =
+  auto *DXC =
       new (DXCAllocator.Allocate()) MCSectionDXContainer(Name, K, nullptr);
+  MapIt->second = DXC;
 
   // The first fragment will store the header
-  allocInitialFragment(*MapIt->second);
-  return MapIt->second;
+  allocInitialFragment(*DXC);
+  return DXC;
 }
 
 MCSubtargetInfo &MCContext::getSubtargetCopy(const MCSubtargetInfo &STI) {

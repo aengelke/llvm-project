@@ -31,6 +31,10 @@ public:
   void printSwitchToSection(const MCAsmInfo &, const Triple &, raw_ostream &,
                             uint32_t) const override;
   bool useCodeAlign() const override { return false; }
+
+  static bool classof(const MCSection *S) {
+    return S->getVariant() == SV_DXContainer;
+  }
 };
 
 } // end namespace llvm

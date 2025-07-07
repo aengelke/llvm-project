@@ -22,7 +22,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <functional>
 #include <initializer_list>
 #include <iterator>
 #include <limits>
@@ -151,9 +150,7 @@ protected:
 
   /// Return true if V is an internal reference to the given range.
   bool isReferenceToRange(const void *V, const void *First, const void *Last) const {
-    // Use std::less to avoid UB.
-    std::less<> LessThan;
-    return !LessThan(V, First) && LessThan(V, Last);
+    return (uintptr_t)V >= (uintptr_t)First && (uintptr_t)V < (uintptr_t)Last;
   }
 
   /// Return true if V is an internal reference to this vector.
@@ -164,10 +161,9 @@ protected:
   /// Return true if First and Last form a valid (possibly empty) range in this
   /// vector's storage.
   bool isRangeInStorage(const void *First, const void *Last) const {
-    // Use std::less to avoid UB.
-    std::less<> LessThan;
-    return !LessThan(First, this->begin()) && !LessThan(Last, First) &&
-           !LessThan(this->end(), Last);
+    return (uintptr_t)First >= (uintptr_t)begin() &&
+           (uintptr_t)Last >= (uintptr_t)First &&
+           (uintptr_t)end() >= (uintptr_t)Last;
   }
 
   /// Return true unless Elt will be invalidated by resizing the vector to

@@ -46,6 +46,7 @@ namespace vfs {
 class FileSystem;
 }
 
+class Error;
 class StringSaver;
 
 /// This namespace contains all of the command line option processing machinery.

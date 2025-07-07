@@ -79,6 +79,7 @@
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/FileUtilities.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/Timer.h"

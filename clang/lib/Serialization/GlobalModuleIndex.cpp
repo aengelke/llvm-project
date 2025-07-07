@@ -24,6 +24,7 @@
 #include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/FileUtilities.h"
 #include "llvm/Support/LockFileManager.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"

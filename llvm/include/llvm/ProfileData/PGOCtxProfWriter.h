@@ -20,6 +20,9 @@
 #include "llvm/Support/Compiler.h"
 
 namespace llvm {
+
+class Error;
+
 enum PGOCtxProfileRecords {
   Invalid = 0,
   Version,

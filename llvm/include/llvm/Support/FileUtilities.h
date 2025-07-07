@@ -98,6 +98,19 @@ private:
   StringRef InputFilename;
   sys::fs::file_status InputStatus;
 };
+
+class Error;
+class raw_ostream;
+
+/// This helper creates an output stream and then passes it to \p Write.
+/// The stream created is based on the specified \p OutputFileName:
+/// llvm::outs for "-", raw_null_ostream for "/dev/null", and raw_fd_ostream
+/// for other names. For raw_fd_ostream instances, the stream writes to
+/// a temporary file. The final output file is atomically replaced with the
+/// temporary file after the \p Write function is finished.
+LLVM_ABI Error writeToOutput(StringRef OutputFileName,
+                             std::function<Error(raw_ostream &)> Write);
+
 } // namespace llvm
 
 #endif

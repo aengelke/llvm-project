@@ -14,6 +14,7 @@
 
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/BranchProbability.h"
+#include <functional>
 
 namespace llvm {
 

@@ -21,6 +21,7 @@
 #include "clang/Basic/LLVM.h"
 #include "clang/StaticAnalyzer/Core/CheckerRegistryData.h"
 #include "llvm/ADT/StringRef.h"
+#include <functional>
 
 // FIXME: move this information to an HTML file in docs/.
 // At the very least, a checker plugin is a dynamic library that exports

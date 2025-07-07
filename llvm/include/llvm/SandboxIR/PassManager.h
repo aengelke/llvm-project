@@ -19,6 +19,7 @@
 #define LLVM_SANDBOXIR_PASSMANAGER_H
 
 #include "llvm/Support/Compiler.h"
+#include <functional>
 #include <memory>
 
 #include "llvm/ADT/DenseMap.h"

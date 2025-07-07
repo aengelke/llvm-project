@@ -23,8 +23,8 @@
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
-
 #include <cstdint>
+#include <functional>
 
 namespace llvm {
 

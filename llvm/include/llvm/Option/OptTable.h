@@ -17,6 +17,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/StringSaver.h"
 #include <cassert>
+#include <functional>
 #include <string>
 #include <vector>
 

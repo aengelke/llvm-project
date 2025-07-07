@@ -19,6 +19,7 @@
 #include "llvm/CodeGen/TargetOpcodes.h"
 #include "llvm/CodeGenTypes/LowLevelType.h"
 #include "llvm/Support/Compiler.h"
+#include <functional>
 #include <unordered_map>
 #include <vector>
 

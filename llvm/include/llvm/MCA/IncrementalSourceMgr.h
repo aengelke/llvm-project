@@ -17,6 +17,7 @@
 #include "llvm/MCA/SourceMgr.h"
 #include "llvm/Support/Compiler.h"
 #include <deque>
+#include <functional>
 
 namespace llvm {
 namespace mca {

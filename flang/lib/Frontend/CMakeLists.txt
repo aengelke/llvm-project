@@ -13,6 +13,8 @@ add_flang_library(flangFrontend
   TextDiagnosticBuffer.cpp
   TextDiagnostic.cpp
 
+  DISABLE_PCH_REUSE
+
   DEPENDS
   CUFDialect
   FIRDialect

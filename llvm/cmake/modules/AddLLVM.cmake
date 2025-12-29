@@ -68,6 +68,10 @@ function(llvm_update_compile_flags name)
 
   target_compile_options(${name} PRIVATE ${LLVM_COMPILE_FLAGS} $<$<COMPILE_LANGUAGE:CXX>:${LLVM_COMPILE_CXXFLAGS}>)
   target_compile_definitions(${name} PRIVATE ${LLVM_COMPILE_DEFINITIONS})
+  if(LLVM_REUSE_PCH)
+    message(STATUS "Using PCH ${LLVM_REUSE_PCH} for ${name}")
+    target_precompile_headers(${name} REUSE_FROM ${LLVM_REUSE_PCH})
+  endif()
 endfunction()
 
 function(add_llvm_symbol_exports target_name export_file)
@@ -495,11 +499,12 @@ endfunction(set_windows_version_resource_properties)
 #   )
 function(llvm_add_library name)
   cmake_parse_arguments(ARG
-    "MODULE;SHARED;STATIC;OBJECT;DISABLE_LLVM_LINK_LLVM_DYLIB;SONAME;NO_INSTALL_RPATH;COMPONENT_LIB"
+    "MODULE;SHARED;STATIC;OBJECT;DISABLE_LLVM_LINK_LLVM_DYLIB;SONAME;NO_INSTALL_RPATH;COMPONENT_LIB;DISABLE_PCH_REUSE"
     "OUTPUT_NAME;PLUGIN_TOOL;ENTITLEMENTS;BUNDLE_PATH"
     "ADDITIONAL_HEADERS;DEPENDS;LINK_COMPONENTS;LINK_LIBS;OBJLIBS"
     ${ARGN})
   list(APPEND LLVM_COMMON_DEPENDS ${ARG_DEPENDS})
+  list(APPEND ARG_LINK_COMPONENTS ${LLVM_LINK_COMPONENTS})
   if(ARG_ADDITIONAL_HEADERS)
     # Pass through ADDITIONAL_HEADERS.
     set(ARG_ADDITIONAL_HEADERS ADDITIONAL_HEADERS ${ARG_ADDITIONAL_HEADERS})
@@ -528,6 +533,20 @@ function(llvm_add_library name)
     endif()
     if(NOT ARG_SHARED)
       set(ARG_STATIC TRUE)
+    endif()
+  endif()
+
+  if(LLVM_REQUIRES_RTTI OR LLVM_REQUIRES_EH)
+    # Non-default RTTI/EH results in incompatible flags, precluding PCH reuse.
+    set(ARG_DISABLE_PCH_REUSE TRUE)
+  endif()
+  if(NOT ARG_DISABLE_PCH_REUSE)
+    if("CodeGen" IN_LIST ARG_LINK_COMPONENTS)
+      set(LLVM_REUSE_PCH LLVMCodeGen)
+    elseif("Core" IN_LIST ARG_LINK_COMPONENTS)
+      set(LLVM_REUSE_PCH LLVMCore)
+    elseif("Support" IN_LIST ARG_LINK_COMPONENTS)
+      set(LLVM_REUSE_PCH LLVMSupport)
     endif()
   endif()
 
@@ -750,7 +769,6 @@ function(llvm_add_library name)
       endif()
       llvm_map_components_to_libnames(llvm_libs
        ${ARG_LINK_COMPONENTS}
-       ${LLVM_LINK_COMPONENTS}
        )
     endif()
   else()
@@ -761,7 +779,7 @@ function(llvm_add_library name)
     # It would be nice to verify that we have the dependencies for this library
     # name, but using get_property(... SET) doesn't suffice to determine if a
     # property has been set to an empty value.
-    set_property(TARGET ${name} PROPERTY LLVM_LINK_COMPONENTS ${ARG_LINK_COMPONENTS} ${LLVM_LINK_COMPONENTS})
+    set_property(TARGET ${name} PROPERTY LLVM_LINK_COMPONENTS ${ARG_LINK_COMPONENTS})
 
     # This property is an internal property only used to make sure the
     # link step applied in LLVMBuildResolveComponentsLink uses the same

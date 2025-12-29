@@ -80,6 +80,8 @@ add_llvm_component_library(LLVMCore
   VFABIDemangler.cpp
   RuntimeLibcalls.cpp
 
+  DISABLE_PCH_REUSE
+
   ADDITIONAL_HEADER_DIRS
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/IR
 
@@ -96,3 +98,7 @@ add_llvm_component_library(LLVMCore
   Support
   TargetParser
   )
+
+target_precompile_headers(LLVMCore PRIVATE
+  "$<$<COMPILE_LANGUAGE:CXX>:\"llvm/IR/pch.h\">"
+)

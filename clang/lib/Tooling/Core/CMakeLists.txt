@@ -1,4 +1,4 @@
-set(LLVM_LINK_COMPONENTS support)
+set(LLVM_LINK_COMPONENTS Support)
 
 add_clang_library(clangToolingCore
   Diagnostic.cpp

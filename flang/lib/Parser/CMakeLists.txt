@@ -25,6 +25,8 @@ add_flang_library(FortranParser
   unparse.cpp
   user-state.cpp
 
+  DISABLE_PCH_REUSE
+
   LINK_LIBS
   FortranSupport
 

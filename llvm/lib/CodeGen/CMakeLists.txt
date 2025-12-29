@@ -262,6 +262,8 @@ add_llvm_component_library(LLVMCodeGen
   LiveDebugValues/VarLocBasedImpl.cpp
   LiveDebugValues/InstrRefBasedImpl.cpp
 
+  DISABLE_PCH_REUSE
+
   ADDITIONAL_HEADER_DIRS
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/CodeGen
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/CodeGen/PBQP
@@ -289,6 +291,10 @@ add_llvm_component_library(LLVMCodeGen
   TargetParser
   TransformUtils
   )
+
+target_precompile_headers(LLVMCodeGen PRIVATE
+  "$<$<COMPILE_LANGUAGE:CXX>:\"llvm/CodeGen/pch.h\">"
+)
 
 add_subdirectory(SelectionDAG)
 add_subdirectory(AsmPrinter)

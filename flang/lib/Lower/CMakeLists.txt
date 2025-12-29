@@ -38,6 +38,8 @@ add_flang_library(FortranLower
   Support/Utils.cpp
   SymbolMap.cpp
   VectorSubscripts.cpp
+
+  DISABLE_PCH_REUSE
   
   DEPENDS
   CUFAttrs

@@ -66,6 +66,8 @@ add_flang_library(FortranEvaluate
   ${LIBPGMATH}
   ${QUADMATHLIB}
 
+  DISABLE_PCH_REUSE
+
   LINK_COMPONENTS
   Support
 

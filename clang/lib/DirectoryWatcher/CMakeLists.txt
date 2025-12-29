@@ -1,6 +1,6 @@
 include(CheckIncludeFiles)
 
-set(LLVM_LINK_COMPONENTS support)
+set(LLVM_LINK_COMPONENTS Support)
 
 set(DIRECTORY_WATCHER_SOURCES DirectoryScanner.cpp)
 set(DIRECTORY_WATCHER_LINK_LIBS "")

@@ -53,6 +53,8 @@ add_flang_library(FortranSemantics
   type.cpp
   unparse-with-symbols.cpp
 
+  DISABLE_PCH_REUSE
+
   DEPENDS
   acc_gen
   omp_gen

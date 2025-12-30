@@ -13,6 +13,8 @@
 
 set(LLVM_SUBPROJECT_TITLE "Third-Party/Google Test")
 
+set(GTEST_PCH [["gtest/gtest.h"]])
+
 if(LLVM_RUNTIMES_BUILD)
   # This instance of GTest is use for unittests for the runtime libraries. It
   # must not link to LLVMSupport (used for llvm::raw_ostream and llvm::cl
@@ -37,6 +39,7 @@ else()
   set(GTEST_LLVM_COMPONENTS "Support")
   set(gtest_name "llvm_gtest")
   set(gtest_main_src UnitTestMain/TestMain.cpp)
+  list(APPEND GTEST_PCH [["llvm/Support/pch.h"]])
 endif()
 
 if(WIN32)
@@ -59,7 +62,6 @@ if(CXX_SUPPORTS_COVERED_SWITCH_DEFAULT_FLAG)
   add_definitions("-Wno-covered-switch-default")
 endif()
 
-set(LLVM_REQUIRES_RTTI 1)
 add_definitions( -DGTEST_HAS_RTTI=0 )
 
 if (HAVE_LIBPTHREAD)
@@ -75,6 +77,8 @@ endif ()
 add_llvm_library("${gtest_name}"
   googletest/src/gtest-all.cc
   googlemock/src/gmock-all.cc
+
+  DISABLE_PCH_REUSE
 
   LINK_LIBS
   ${LIBS}
@@ -121,9 +125,13 @@ else()
     )
 endif()
 
+target_precompile_headers("${gtest_name}" PRIVATE ${GTEST_PCH})
+
 
 add_llvm_library("${gtest_name}_main"
   ${gtest_main_src}
+
+  DISABLE_PCH_REUSE
 
   LINK_LIBS
   "${gtest_name}"
@@ -133,6 +141,8 @@ add_llvm_library("${gtest_name}_main"
 
   ${BUILDTREE_ONLY}
 )
+
+target_precompile_headers("${gtest_name}_main" REUSE_FROM "${gtest_name}")
 
 if (LLVM_INSTALL_GTEST)
   install(DIRECTORY googletest/include/gtest/ DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/llvm-gtest/gtest/" COMPONENT "${gtest_name}")

@@ -13,7 +13,6 @@
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/Support/Endian.h"
 
-using namespace llvm;
 using namespace lld;
 using namespace lld::macho;
 using namespace llvm::support::endian;
@@ -24,7 +23,7 @@ uint64_t EhReader::readLength(size_t *off) const {
     failOn(errOff, "CIE/FDE too small");
   uint64_t len = read32le(data.data() + *off);
   *off += 4;
-  if (len == dwarf::DW_LENGTH_DWARF64) {
+  if (len == llvm::dwarf::DW_LENGTH_DWARF64) {
     // FIXME: test this DWARF64 code path
     if (*off + 8 > data.size())
       failOn(errOff, "CIE/FDE too small");
@@ -39,7 +38,7 @@ uint64_t EhReader::readLength(size_t *off) const {
 void EhReader::skipValidLength(size_t *off) const {
   uint32_t len = read32le(data.data() + *off);
   *off += 4;
-  if (len == dwarf::DW_LENGTH_DWARF64)
+  if (len == llvm::dwarf::DW_LENGTH_DWARF64)
     *off += 8;
 }
 
@@ -106,10 +105,10 @@ void EhReader::failOn(size_t errOff, const Twine &msg) const {
  *   `(a + offset) - b` if Invert == true
  */
 template <bool Invert = false>
-static void createSubtraction(PointerUnion<Symbol *, InputSection *> a,
-                              PointerUnion<Symbol *, InputSection *> b,
+static void createSubtraction(llvm::PointerUnion<Symbol *, InputSection *> a,
+                              llvm::PointerUnion<Symbol *, InputSection *> b,
                               uint64_t off, uint8_t length,
-                              SmallVectorImpl<Reloc> *newRelocs) {
+                              llvm::SmallVectorImpl<Reloc> *newRelocs) {
   auto subtrahend = a;
   auto minuend = b;
   if (Invert)
@@ -124,13 +123,13 @@ static void createSubtraction(PointerUnion<Symbol *, InputSection *> a,
 }
 
 void EhRelocator::makePcRel(uint64_t off,
-                            PointerUnion<Symbol *, InputSection *> target,
+                            llvm::PointerUnion<Symbol *, InputSection *> target,
                             uint8_t length) {
   createSubtraction(isec->symbols[0], target, off, length, &newRelocs);
 }
 
 void EhRelocator::makeNegativePcRel(
-    uint64_t off, PointerUnion<Symbol *, InputSection *> target,
+    uint64_t off, llvm::PointerUnion<Symbol *, InputSection *> target,
     uint8_t length) {
   createSubtraction</*Invert=*/true>(isec, target, off, length, &newRelocs);
 }

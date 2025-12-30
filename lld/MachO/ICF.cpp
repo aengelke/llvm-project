@@ -20,7 +20,6 @@
 
 #include <atomic>
 
-using namespace llvm;
 using namespace lld;
 using namespace lld::macho;
 
@@ -374,10 +373,10 @@ void ICF::forEachClass(llvm::function_ref<void(size_t, size_t)> func) {
   size_t boundaries[shards + 1];
   boundaries[0] = 0;
   boundaries[shards] = icfInputs.size();
-  parallelFor(1, shards, [&](size_t i) {
+  llvm::parallelFor(1, shards, [&](size_t i) {
     boundaries[i] = findBoundary((i - 1) * step, icfInputs.size());
   });
-  parallelFor(1, shards + 1, [&](size_t i) {
+  llvm::parallelFor(1, shards + 1, [&](size_t i) {
     if (boundaries[i - 1] < boundaries[i]) {
       forEachClassRange(boundaries[i - 1], boundaries[i], func);
     }
@@ -388,7 +387,7 @@ void ICF::forEachClass(llvm::function_ref<void(size_t, size_t)> func) {
 void ICF::run() {
   // Into each origin-section hash, combine all reloc referent section hashes.
   for (icfPass = 0; icfPass < 2; ++icfPass) {
-    parallelForEach(icfInputs, [&](ConcatInputSection *isec) {
+    llvm::parallelForEach(icfInputs, [&](ConcatInputSection *isec) {
       uint32_t hash = isec->icfEqClass[icfPass % 2];
       for (const Reloc &r : isec->relocs) {
         if (auto *sym = r.referent.dyn_cast<Symbol *>()) {
@@ -507,7 +506,7 @@ void macho::markSymAsAddrSig(Symbol *s) {
 }
 
 void macho::markAddrSigSymbols() {
-  TimeTraceScope timeScope("Mark addrsig symbols");
+  llvm::TimeTraceScope timeScope("Mark addrsig symbols");
   for (InputFile *file : inputFiles) {
     ObjFile *obj = dyn_cast<ObjFile>(file);
     if (!obj)
@@ -550,7 +549,7 @@ Defined *macho::getBodyForThunkFoldedSym(Defined *foldedSym) {
   return cast<Defined>(targetSym);
 }
 void macho::foldIdenticalSections(bool onlyCfStrings) {
-  TimeTraceScope timeScope("Fold Identical Code Sections");
+  llvm::TimeTraceScope timeScope("Fold Identical Code Sections");
   // The ICF equivalence-class segregation algorithm relies on pre-computed
   // hashes of InputSection::data for the ConcatOutputSection::inputs and all
   // sections referenced by their relocs. We could recursively traverse the
@@ -575,8 +574,9 @@ void macho::foldIdenticalSections(bool onlyCfStrings) {
                                         isSelRefsSection(isec);
     // NOTE: __objc_selrefs is typically marked as no_dead_strip by MC, but we
     // can still fold it.
-    bool hasFoldableFlags = (isSelRefsSection(isec) ||
-                             sectionType(isec->getFlags()) == MachO::S_REGULAR);
+    bool hasFoldableFlags =
+        (isSelRefsSection(isec) ||
+         sectionType(isec->getFlags()) == llvm::MachO::S_REGULAR);
 
     bool isCodeSec = isCodeSection(isec);
 
@@ -620,7 +620,7 @@ void macho::foldIdenticalSections(bool onlyCfStrings) {
       isec->icfEqClass[0] = ++icfUniqueID;
     }
   }
-  parallelForEach(foldable, [](ConcatInputSection *isec) {
+  llvm::parallelForEach(foldable, [](ConcatInputSection *isec) {
     assert(isec->icfEqClass[0] == 0); // don't overwrite a unique ID!
     // Turn-on the top bit to guarantee that valid hashes have no collisions
     // with the small-integer unique IDs for ICF-ineligible sections

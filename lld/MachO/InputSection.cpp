@@ -21,7 +21,6 @@
 #include "lld/Common/Memory.h"
 #include "llvm/Support/xxhash.h"
 
-using namespace llvm;
 using namespace llvm::MachO;
 using namespace llvm::support;
 using namespace lld;
@@ -146,7 +145,7 @@ std::string InputSection::getSourceLocation(uint64_t off) const {
   }
 
   auto createMsg = [&](StringRef path, unsigned line) {
-    std::string filename = sys::path::filename(path).str();
+    std::string filename = llvm::sys::path::filename(path).str();
     std::string lineStr = (":" + Twine(line)).str();
     if (filename == path)
       return filename + lineStr;
@@ -154,8 +153,8 @@ std::string InputSection::getSourceLocation(uint64_t off) const {
   };
 
   // First, look up a function for a given offset.
-  if (std::optional<DILineInfo> li = dwarf->getDILineInfo(
-          section.addr + off, object::SectionedAddress::UndefSection))
+  if (std::optional<llvm::DILineInfo> li = dwarf->getDILineInfo(
+          section.addr + off, llvm::object::SectionedAddress::UndefSection))
     return createMsg(li->FileName, li->Line);
 
   // If it failed, look up again as a variable.
@@ -302,8 +301,8 @@ StringPiece &CStringInputSection::getStringPiece(uint64_t off) {
   if (off >= data.size())
     fatal(toString(this) + ": offset is outside the section");
 
-  auto it =
-      partition_point(pieces, [=](StringPiece p) { return p.inSecOff <= off; });
+  auto it = llvm::partition_point(
+      pieces, [=](StringPiece p) { return p.inSecOff <= off; });
   return it[-1];
 }
 
@@ -315,8 +314,8 @@ size_t CStringInputSection::getStringPieceIndex(uint64_t off) const {
   if (off >= data.size())
     fatal(toString(this) + ": offset is outside the section");
 
-  auto it =
-      partition_point(pieces, [=](StringPiece p) { return p.inSecOff <= off; });
+  auto it = llvm::partition_point(
+      pieces, [=](StringPiece p) { return p.inSecOff <= off; });
   return std::distance(pieces.begin(), it) - 1;
 }
 

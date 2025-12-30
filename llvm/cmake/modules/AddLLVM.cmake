@@ -1042,10 +1042,25 @@ endmacro()
 
 macro(add_llvm_executable name)
   cmake_parse_arguments(ARG
-    "DISABLE_LLVM_LINK_LLVM_DYLIB;IGNORE_EXTERNALIZE_DEBUGINFO;NO_INSTALL_RPATH;SUPPORT_PLUGINS;EXPORT_SYMBOLS"
+    "DISABLE_LLVM_LINK_LLVM_DYLIB;IGNORE_EXTERNALIZE_DEBUGINFO;NO_INSTALL_RPATH;SUPPORT_PLUGINS;EXPORT_SYMBOLS;DISABLE_PCH_REUSE"
     "ENTITLEMENTS;BUNDLE_PATH"
     ""
     ${ARGN})
+  # TODO: deduplicate
+  if(LLVM_REQUIRES_RTTI OR LLVM_REQUIRES_EH)
+    # Non-default RTTI/EH results in incompatible flags, precluding PCH reuse.
+    set(ARG_DISABLE_PCH_REUSE TRUE)
+  endif()
+  if(NOT ARG_DISABLE_PCH_REUSE)
+    if("CodeGen" IN_LIST LLVM_LINK_COMPONENTS)
+      set(LLVM_REUSE_PCH LLVMCodeGen)
+    elseif("Core" IN_LIST LLVM_LINK_COMPONENTS)
+      set(LLVM_REUSE_PCH LLVMCore)
+    elseif("Support" IN_LIST LLVM_LINK_COMPONENTS)
+      set(LLVM_REUSE_PCH LLVMSupport)
+    endif()
+  endif()
+
   generate_llvm_objects(${name} ${ARG_UNPARSED_ARGUMENTS})
   add_windows_version_resource_file(ALL_FILES ${ALL_FILES})
 
@@ -1790,7 +1805,7 @@ function(add_unittest test_suite test_name)
   endif()
 
   list(APPEND LLVM_LINK_COMPONENTS Support) # gtest needs it for raw_ostream
-  add_llvm_executable(${test_name} IGNORE_EXTERNALIZE_DEBUGINFO NO_INSTALL_RPATH ${ARGN})
+  add_llvm_executable(${test_name} IGNORE_EXTERNALIZE_DEBUGINFO NO_INSTALL_RPATH DISABLE_PCH_REUSE ${ARGN})
   get_subproject_title(subproject_title)
   set_target_properties(${test_name} PROPERTIES FOLDER "${subproject_title}/Tests/Unit")
 

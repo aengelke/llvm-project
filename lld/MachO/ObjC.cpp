@@ -17,10 +17,10 @@
 
 #include "lld/Common/ErrorHandler.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Support/TimeProfiler.h"
 
-using namespace llvm;
 using namespace llvm::MachO;
 using namespace lld;
 using namespace lld::macho;
@@ -38,10 +38,11 @@ template <class LP> static bool objectHasObjCSection(MemoryBufferRef mb) {
     auto sectionHeaders = ArrayRef<SectionHeader>{
         reinterpret_cast<const SectionHeader *>(c + 1), c->nsects};
     for (const SectionHeader &secHead : sectionHeaders) {
-      StringRef sectname(secHead.sectname,
-                         strnlen(secHead.sectname, sizeof(secHead.sectname)));
-      StringRef segname(secHead.segname,
-                        strnlen(secHead.segname, sizeof(secHead.segname)));
+      llvm::StringRef sectname(
+          secHead.sectname,
+          strnlen(secHead.sectname, sizeof(secHead.sectname)));
+      llvm::StringRef segname(
+          secHead.segname, strnlen(secHead.segname, sizeof(secHead.segname)));
       if ((segname == segment_names::data &&
            sectname == section_names::objcCatList) ||
           (segname == segment_names::text &&
@@ -62,9 +63,9 @@ static bool objectHasObjCSection(MemoryBufferRef mb) {
 
 bool macho::hasObjCSection(MemoryBufferRef mb) {
   switch (identify_magic(mb.getBuffer())) {
-  case file_magic::macho_object:
+  case llvm::file_magic::macho_object:
     return objectHasObjCSection(mb);
-  case file_magic::bitcode:
+  case llvm::file_magic::bitcode:
     return check(isBitcodeContainingObjCCategory(mb));
   default:
     return false;
@@ -153,8 +154,8 @@ enum MethodKind {
 };
 
 struct ObjcClass {
-  DenseMap<CachedHashStringRef, MethodContainer> instanceMethods;
-  DenseMap<CachedHashStringRef, MethodContainer> classMethods;
+  llvm::DenseMap<llvm::CachedHashStringRef, MethodContainer> instanceMethods;
+  llvm::DenseMap<llvm::CachedHashStringRef, MethodContainer> classMethods;
 };
 
 } // namespace
@@ -177,7 +178,7 @@ private:
   ListHeaderLayout listHeaderLayout;
   MethodLayout methodLayout;
 
-  DenseMap<const Symbol *, ObjcClass> classMap;
+  llvm::DenseMap<const Symbol *, ObjcClass> classMap;
 };
 
 ObjcCategoryChecker::ObjcCategoryChecker()
@@ -196,7 +197,7 @@ void ObjcCategoryChecker::parseMethods(const ConcatInputSection *methodsIsec,
         methodLayout.nameOffset)
       continue;
 
-    CachedHashStringRef methodName(r.getReferentString());
+    llvm::CachedHashStringRef methodName(r.getReferentString());
     // +load methods are special: all implementations are called by the runtime
     // even if they are part of the same class. Thus there is no need to check
     // for duplicates.
@@ -311,7 +312,7 @@ void ObjcCategoryChecker::parseClass(const Defined *classSym) {
 }
 
 void objc::checkCategories() {
-  TimeTraceScope timeScope("ObjcCategoryChecker");
+  llvm::TimeTraceScope timeScope("ObjcCategoryChecker");
 
   ObjcCategoryChecker checker;
   for (const InputSection *isec : inputSections) {
@@ -420,7 +421,7 @@ public:
   static void doCleanup();
 
 private:
-  DenseSet<const Symbol *> collectNlCategories();
+  llvm::DenseSet<const Symbol *> collectNlCategories();
   void collectAndValidateCategoriesData();
   bool
   mergeCategoriesIntoSingleCategory(std::vector<InfoInputCategory> &categories);
@@ -429,7 +430,7 @@ private:
   void eraseMergedCategories();
 
   void generateCatListForNonErasedCategories(
-      MapVector<ConcatInputSection *, std::set<uint64_t>>
+      llvm::MapVector<ConcatInputSection *, std::set<uint64_t>>
           catListToErasedOffsets);
   void collectSectionWriteInfoFromIsec(const InputSection *isec,
                                        InfoWriteSection &catWriteInfo);
@@ -494,14 +495,14 @@ private:
   InfoCategoryWriter infoCategoryWriter;
   std::vector<ConcatInputSection *> &allInputSections;
   // Map of base class Symbol to list of InfoInputCategory's for it
-  MapVector<const Symbol *, std::vector<InfoInputCategory>> categoryMap;
+  llvm::MapVector<const Symbol *, std::vector<InfoInputCategory>> categoryMap;
 
   // Normally, the binary data comes from the input files, but since we're
   // generating binary data ourselves, we use the below array to store it in.
   // Need this to be 'static' so the data survives past the ObjcCategoryMerger
   // object, as the data will be read by the Writer when the final binary is
   // generated.
-  static SmallVector<std::unique_ptr<SmallVector<uint8_t>>>
+  static llvm::SmallVector<std::unique_ptr<llvm::SmallVector<uint8_t>>>
       generatedSectionData;
 };
 
@@ -542,7 +543,7 @@ ObjcCategoryMerger::tryGetSymbolAtIsecOffset(const ConcatInputSection *isec,
   if (!reloc)
     return nullptr;
 
-  Symbol *sym = dyn_cast_if_present<Symbol *>(reloc->referent);
+  Symbol *sym = llvm::dyn_cast_if_present<Symbol *>(reloc->referent);
 
   if (reloc->addend && sym) {
     assert(isa<Defined>(sym) && "Expected defined for non-zero addend");
@@ -1149,8 +1150,8 @@ void ObjcCategoryMerger::createSymbolReference(Defined *refFrom,
 // Get the list of categories in the '__objc_nlcatlist' section. We can't
 // optimize these as they have a '+load' method that has to be called at
 // runtime.
-DenseSet<const Symbol *> ObjcCategoryMerger::collectNlCategories() {
-  DenseSet<const Symbol *> nlCategories;
+llvm::DenseSet<const Symbol *> ObjcCategoryMerger::collectNlCategories() {
+  llvm::DenseSet<const Symbol *> nlCategories;
 
   for (InputSection *sec : allInputSections) {
     if (sec->getName() != section_names::objcNonLazyCatList)
@@ -1219,7 +1220,7 @@ void ObjcCategoryMerger::collectAndValidateCategoriesData() {
 // (not erased). For these not erased categories, we generate new __objc_catlist
 // entries since the parent __objc_catlist entry will be erased
 void ObjcCategoryMerger::generateCatListForNonErasedCategories(
-    const MapVector<ConcatInputSection *, std::set<uint64_t>>
+    const llvm::MapVector<ConcatInputSection *, std::set<uint64_t>>
         catListToErasedOffsets) {
 
   // Go through all offsets of all __objc_catlist's that we process and if there
@@ -1284,7 +1285,8 @@ void ObjcCategoryMerger::eraseISec(ConcatInputSection *isec) {
 // them.
 void ObjcCategoryMerger::eraseMergedCategories() {
   // Map of InputSection to a set of offsets of the categories that were merged
-  MapVector<ConcatInputSection *, std::set<uint64_t>> catListToErasedOffsets;
+  llvm::MapVector<ConcatInputSection *, std::set<uint64_t>>
+      catListToErasedOffsets;
 
   for (auto &mapEntry : categoryMap) {
     for (InfoInputCategory &catInfo : mapEntry.second) {
@@ -1374,7 +1376,7 @@ SmallVector<uint8_t> &ObjcCategoryMerger::newSectionData(uint32_t size) {
 } // namespace
 
 void objc::mergeCategories() {
-  TimeTraceScope timeScope("ObjcCategoryMerger");
+  llvm::TimeTraceScope timeScope("ObjcCategoryMerger");
 
   ObjcCategoryMerger merger(inputSections);
   merger.doMerge();

@@ -27,7 +27,6 @@
 
 #include <numeric>
 
-using namespace llvm;
 using namespace llvm::MachO;
 using namespace llvm::support::endian;
 using namespace lld;
@@ -118,7 +117,7 @@ struct CompactUnwindEntry {
   InputSection *lsda;
 };
 
-using EncodingMap = DenseMap<compact_unwind_encoding_t, size_t>;
+using EncodingMap = llvm::DenseMap<compact_unwind_encoding_t, size_t>;
 
 struct SecondLevelPage {
   uint32_t kind;
@@ -146,7 +145,7 @@ private:
   Symbol *canonicalizePersonality(Symbol *);
 
   uint64_t unwindInfoSize = 0;
-  SmallVector<decltype(symbols)::value_type, 0> symbolsVec;
+  llvm::SmallVector<decltype(symbols)::value_type, 0> symbolsVec;
   CompactUnwindLayout cuLayout;
   std::vector<std::pair<compact_unwind_encoding_t, size_t>> commonEncodings;
   EncodingMap commonEncodingIndexes;
@@ -154,12 +153,13 @@ private:
   // in symbolsVec.
   std::vector<CompactUnwindEntry> cuEntries;
   std::vector<Symbol *> personalities;
-  SmallDenseMap<std::pair<InputSection *, uint64_t /* addend */>, Symbol *>
+  llvm::SmallDenseMap<std::pair<InputSection *, uint64_t /* addend */>,
+                      Symbol *>
       personalityTable;
   // Indices into cuEntries for CUEs with a non-null LSDA.
   std::vector<size_t> entriesWithLsda;
   // Map of cuEntries index to an index within the LSDA array.
-  DenseMap<size_t, uint32_t> lsdaIndex;
+  llvm::DenseMap<size_t, uint32_t> lsdaIndex;
   std::vector<SecondLevelPage> secondLevelPages;
   uint64_t level2PagesOffset = 0;
   // The highest-address function plus its size. The unwinder needs this to
@@ -346,7 +346,7 @@ Symbol *UnwindInfoSectionImpl::canonicalizePersonality(Symbol *personality) {
 // is no source address to make a relative location meaningful.
 void UnwindInfoSectionImpl::relocateCompactUnwind(
     std::vector<CompactUnwindEntry> &cuEntries) {
-  parallelFor(0, symbolsVec.size(), [&](size_t i) {
+  llvm::parallelFor(0, symbolsVec.size(), [&](size_t i) {
     CompactUnwindEntry &cu = cuEntries[i];
     const Defined *d = symbolsVec[i].second;
     cu.functionAddress = d->getVA();
@@ -383,9 +383,8 @@ void UnwindInfoSectionImpl::relocateCompactUnwind(
     auto buf =
         reinterpret_cast<const uint8_t *>(d->unwindEntry()->data.data()) -
         target->wordSize;
-    cu.functionLength =
-        support::endian::read32le(buf + cuLayout.functionLengthOffset);
-    cu.encoding = support::endian::read32le(buf + cuLayout.encodingOffset);
+    cu.functionLength = read32le(buf + cuLayout.functionLengthOffset);
+    cu.encoding = read32le(buf + cuLayout.encodingOffset);
     for (const Reloc &r : d->unwindEntry()->relocs) {
       if (r.offset == cuLayout.personalityOffset)
         cu.personality = cast<Symbol *>(r.referent);
@@ -402,7 +401,7 @@ void UnwindInfoSectionImpl::encodePersonalities() {
     if (cu.personality == nullptr)
       continue;
     // Linear search is fast enough for a small array.
-    auto it = find(personalities, cu.personality);
+    auto it = llvm::find(personalities, cu.personality);
     uint32_t personalityIndex; // 1-based index
     if (it != personalities.end()) {
       personalityIndex = std::distance(personalities.begin(), it) + 1;

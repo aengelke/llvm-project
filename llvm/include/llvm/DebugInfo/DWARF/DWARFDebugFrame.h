@@ -29,6 +29,15 @@ struct DIDumpOptions;
 
 namespace dwarf {
 
+struct LLVM_ABI FDECompactUnwind {
+  /// Amount of bytes to skip to the start of the descriptor.
+  uint64_t Skip;
+  /// Actual descriptor.
+  uint64_t Desc;
+
+  FDECompactUnwind(uint64_t Skip, uint64_t Desc) : Skip(Skip), Desc(Desc) {}
+};
+
 class CIE;
 
 /// Create an UnwindTable from a Common Information Entry (CIE).
@@ -161,13 +170,13 @@ class LLVM_ABI FDE : public FrameEntry {
 public:
   FDE(bool IsDWARF64, uint64_t Offset, uint64_t Length, uint64_t CIEPointer,
       uint64_t InitialLocation, uint64_t AddressRange,
-      uint64_t UnwindDescriptor, CIE *Cie, std::optional<uint64_t> LSDAAddress,
-      Triple::ArchType Arch)
+      SmallVector<FDECompactUnwind, 2> &&CompactUnwind, CIE *Cie,
+      std::optional<uint64_t> LSDAAddress, Triple::ArchType Arch)
       : FrameEntry(FK_FDE, IsDWARF64, Offset, Length,
                    Cie ? Cie->getCodeAlignmentFactor() : 0,
                    Cie ? Cie->getDataAlignmentFactor() : 0, Arch),
         CIEPointer(CIEPointer), InitialLocation(InitialLocation),
-        AddressRange(AddressRange), UnwindDescriptor(UnwindDescriptor),
+        AddressRange(AddressRange), CompactUnwind(std::move(CompactUnwind)),
         LinkedCIE(Cie), LSDAAddress(LSDAAddress) {}
 
   ~FDE() override = default;
@@ -176,7 +185,7 @@ public:
   uint64_t getCIEPointer() const { return CIEPointer; }
   uint64_t getInitialLocation() const { return InitialLocation; }
   uint64_t getAddressRange() const { return AddressRange; }
-  uint64_t getUnwindDescriptor() const { return UnwindDescriptor; }
+  ArrayRef<FDECompactUnwind> getCompactUnwind() const { return CompactUnwind; }
   std::optional<uint64_t> getLSDAAddress() const { return LSDAAddress; }
 
   void dump(raw_ostream &OS, DIDumpOptions DumpOpts) const override;
@@ -191,8 +200,8 @@ private:
   const uint64_t CIEPointer;
   const uint64_t InitialLocation;
   const uint64_t AddressRange;
-  // 64-bit descriptor for the compact unwind extension
-  const uint64_t UnwindDescriptor;
+  // Descriptors for the compact unwind extension
+  const SmallVector<FDECompactUnwind, 2> CompactUnwind;
   const CIE *LinkedCIE;
   const std::optional<uint64_t> LSDAAddress;
 };

@@ -759,6 +759,13 @@ public:
   SMLoc getLoc() const { return Loc; }
 };
 
+struct MCFDECompactUnwind {
+  /// Label marking the start of the descriptor and implicitly the end of the
+  /// previous descriptor (if any).
+  MCSymbol *Label;
+  uint64_t Desc; ///< Descriptor.
+};
+
 struct MCDwarfFrameInfo {
   MCDwarfFrameInfo() = default;
 
@@ -770,7 +777,7 @@ struct MCDwarfFrameInfo {
   unsigned CurrentCfaRegister = 0;
   unsigned PersonalityEncoding = 0;
   unsigned LsdaEncoding = 0;
-  uint64_t CompactUnwindEncoding = 0;
+  SmallVector<MCFDECompactUnwind, 2> CompactUnwindEncoding;
   bool ElfCompactUnwindEligible = false;
   bool IsSignalFrame = false;
   bool IsSimple = false;

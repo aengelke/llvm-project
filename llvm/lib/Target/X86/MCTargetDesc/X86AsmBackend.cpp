@@ -384,10 +384,509 @@ private:
     return permutationEncoding;
   }
 
-  /// Implementation of algorithm to generate the compact unwind encoding
+  // Add compact unwind encoding to FI, or return false if encoding failed.
+  bool generateELFCompactUnwindEncoding(MCDwarfFrameInfo *FI,
+                                         const MCContext *Ctx) const {
+    if (!Is64Bit)
+      return false; // Compact unwind is only supported on x86-64.
+
+    ArrayRef<MCCFIInstruction> Instrs = FI->Instructions;
+    if (Instrs.empty())
+      return true; // no instructions need to be generated.
+
+    struct CFIState {
+      uint32_t CFAOff = 1;
+      bool IsRBP = false;
+      uint8_t NumRegs = 0;
+      MCRegister Regs[CU_NUM_SAVED_REGS] = {};
+
+      /// Is empty stack frame? (CFA is rsp+8)
+      bool isEmptyFrame() const { return CFAOff == 1 && !IsRBP; }
+      /// Is RBP-based frame? (CFA is rbp+16, rbp saved at [CFA-16])
+      bool isRBPFrame() const {
+        return CFAOff == 2 && IsRBP && Regs[0] == X86::RBP;
+      }
+
+      void print(const MCRegisterInfo &MRI, raw_ostream &os) const {
+        os << "CFIState{" << CFAOff << "," << (IsRBP ? "rbp" : "rsp") << "," << int(NumRegs);
+        for (MCRegister Reg : Regs)
+          os << "," << MRI.getName(Reg);
+        os << "}";
+      }
+    };
+    CFIState CurState{};
+    CFIState LastState{};
+    uint64_t LastAdvance = 0; // Size of last advance, or 0 if unknown/flexible.
+    MCSymbol *Cur = FI->Begin;
+    MCSymbol *Prev = nullptr;
+
+    // We run a state machine along the CFI instructions.
+    enum TrackingState {
+      /// A NULL descriptor.
+      ModeNULL,
+
+      /// An RSP-based descriptor consisting of just one push. This is a
+      /// separate state which "mov rbp,rsp" can transform into ModeRBPNoCSR.
+      ModeRSPSinglePush,
+
+      /// An RSP-based descriptor inside the prologue.
+      ModeRSPPrologue,
+      /// An RSP-based descriptor.
+      ModeRSPBody,
+      /// An RSP-based descriptor inside the epilogue.
+      ModeRSPEpilogue,
+
+      /// An RBP-based descriptor without any callee-saved registers. CSRs can
+      /// be added, moving the state to ModeRBPWithCSR.
+      ModeRBPNoCSR,
+      /// An RBP-based descriptor with callee-saved registers. No further CSRs
+      /// can be added; if new CSRs are added, they need a separate descriptor.
+      ModeRBPWithCSR,
+      /// An RBP-based descriptor in its epilogue.
+      ModeRBPEpilogue,
+    };
+    TrackingState TState = ModeNULL; // State machine state.
+    CFIState DescState; // CFI state to be encoded in descriptor.
+    MCSymbol *DescStart = Cur; // Begin label of current descriptor.
+    uint64_t PrologueSize = 0; // Size of prologue.
+    uint64_t InnerPrologueSize = 0; // Size of prologue for ModeRBP.
+    // Size of 1/2 bytes advances in prologue for ModeRSP. These are collected
+    // to ensure that they match the size of corresponding push instructions and
+    // that the epilogue advances have corresponding sizes in reverse order.
+    // Note that the first prologue advance is *not* stored, because we can't
+    // know it.
+    SmallVector<uint8_t, 8> PrologueAdvances;
+    // unsigned PrologueAdvances = 0;
+    uint64_t EpilogueSize = 0;
+
+    // Whether Advance can be folded into a prologue/epilogue that is already
+    // Size bytes large.
+    auto CanFoldPE = [](uint64_t Size, uint64_t Advance) {
+      return Advance != 0 && Size + Advance < 256;
+    };
+
+    auto SubRspSize = [](uint64_t DeltaQWords) -> unsigned {
+      return DeltaQWords == 1 ? 1 : DeltaQWords < 16 ? 4 : 7;
+    };
+
+    auto FlushDesc = [&]() {
+      dbgs() << "flush desc: ";
+      DescState.print(MRI, dbgs());
+      dbgs() << " " << DescStart->getFragment() << "+" << DescStart->getOffset();
+      dbgs() << " ps=" << PrologueSize << " es=" << EpilogueSize << "\n";
+      assert(PrologueSize < 256);
+      assert(EpilogueSize < 256);
+      assert(InnerPrologueSize < 256);
+
+      uint64_t Desc = uint64_t{PrologueSize} << 32 | uint64_t{EpilogueSize} << 40;
+      // Callee-saved register encoding is identical for RBP and RSP frames.
+      unsigned RegOff = 0;
+      static constexpr MCRegister RegSaveOrder[] = {
+        X86::RBP, X86::R15, X86::R14, X86::R13, X86::R12, X86::RBX,
+      };
+      for (auto [Idx, Reg] : enumerate(RegSaveOrder)) {
+        if (DescState.Regs[RegOff] == Reg) {
+          Desc |= 1u << Idx;
+          RegOff += 1;
+        }
+      }
+      if (RegOff != DescState.NumRegs) {
+        dbgs() << "FAIL: unexpected reg save order\n";
+        return false;
+      }
+
+      if (DescState.isEmptyFrame()) {
+        Desc = 0;
+      } else if (DescState.isRBPFrame()) {
+        // mode:3, personality:3, prologue_size:8, reserved:12, saved_regs:6.
+        // Personality is set by linker.
+        Desc |= (1u << 29) | InnerPrologueSize << 18;
+      } else {
+        // Verify that prologue advances match push sizes for saved regs.
+        if (!PrologueAdvances.empty()) {
+          // NB: PrologueAdvances does NOT contain the first push.
+          // There are three states in which we could be:
+          // 1. push rbx; push r12; <body> pop r12; <current position>; ...
+          //    - TState = ModeRSPPrologue or ModeRSPSinglePush
+          //    - PrologueAdvances.size() + 1 == DescState.NumRegs
+          //    - PrologueAdvances.size() + 1 == DescState.CFAOff
+          //    - DescState.CFAOff + 1 == LastState.CFAOff
+          // 2. push rbx; push rax; <body> pop rax; <current position>; ...
+          //    - The one-byte advance for "push rax" isn't to save a CSR, it is
+          //      a compact "sub rsp, 8".
+          //    - TState = ModeRSPPrologue or ModeRSPSinglePush
+          //    - PrologueAdvances.size() + 0 == DescState.NumRegs
+          //    - PrologueAdvances.size() + 1 == DescState.CFAOff
+          //    - DescState.CFAOff + 1 == LastState.CFAOff
+          // 3. push rbx; sub rsp, X; <body> add rsp, X; <current position>; ...
+          //    - The larger-than-8 sub is not recorded in PrologueAdvances.
+          //    - TState = ModeRSPBody
+          //    - PrologueAdvances.size() + 1 == DescState.NumRegs
+          //    - PrologueAdvances.size() + 2 == DescState.CFAOff
+
+          // To homogenize cases 2 and 3, we drop the last PrologueAdvance in
+          // case 2, which is the "sub rsp, 8" compressed to "push rax".
+          if (PrologueAdvances.size() == DescState.NumRegs)
+            PrologueAdvances.pop_back();
+
+          if (PrologueAdvances.size() + 1 != DescState.NumRegs) {
+            dbgs() << "FAIL: NumRegs NumAdvances mismatch\n";
+            return false;
+          }
+          for (unsigned i = 1; i < DescState.NumRegs; i++) {
+            if (PrologueAdvances[i - 1] != PushInstrSize(DescState.Regs[i])) {
+              dbgs() << "FAIL: advance prologue for off " << i << " size mismatch: " <<
+                     PrologueAdvances[i - 1] << " != " << PushInstrSize(DescState.Regs[i]) << "\n";
+              return false;
+            }
+          }
+        } else if (PrologueSize != 0 && DescState.NumRegs > 1) {
+          dbgs() << "FAIL: non-zero PrologueSize without individual advances?\n";
+          return false;
+        }
+
+        // mode:3, personality:3, frame_size:20, saved_regs:6.
+        // Personality is set by linker.
+        if (DescState.CFAOff >= uint64_t{1} << 20) {
+          dbgs() << "FAIL: unable to encode RSP frame: large frame\n";
+          return false;
+        }
+        Desc |= (2u << 29) | DescState.CFAOff << 6;
+      }
+
+      FI->CompactUnwindEncoding.push_back({DescStart, Desc});
+      dbgs() << "wrote desc: " << format("%016zx", Desc) << "\n";
+
+      DescStart = Cur;
+      PrologueSize = 0;
+      InnerPrologueSize = 0;
+      PrologueAdvances.clear();
+      EpilogueSize = 0;
+      return true;
+    };
+
+    auto Advance = [&]() {
+      // We advanced LastAdvance bytes (might be unknown length) to Cur and
+      // updated the CFI state to CurState;
+      dbgs() << "advance " << LastAdvance << " ";
+      CurState.print(MRI, dbgs());
+      dbgs() << " Cur=" << Cur->getFragment() << "+" << Cur->getOffset();
+      if (Prev)
+        dbgs() << " Prev=" << Prev->getFragment() << "+" << Prev->getOffset();
+      dbgs() << "\n";
+
+      for (unsigned i = 0; i < CU_NUM_SAVED_REGS; i++) {
+        bool ShouldBeValid = i < CurState.NumRegs;
+        if (CurState.Regs[i].isValid() != ShouldBeValid) {
+          dbgs() << "FAIL: registers saved out of order?\n";
+          return false;
+        }
+      }
+
+      // First try to fold new state into current descriptor.
+      switch (TState) {
+      case ModeNULL: {
+      modeNull:
+        if (CurState.isEmptyFrame())
+          return true; // Do nothing, remain in NULL descriptor.
+        assert(LastState.CFAOff == 1 && !LastState.IsRBP);
+        assert(PrologueSize == 0);
+        if (CurState.CFAOff == 2 && !CurState.IsRBP &&
+            CanFoldPE(PrologueSize, LastAdvance)) {
+          // Stack frame after first push.
+          TState = ModeRSPSinglePush;
+          DescState = CurState;
+          PrologueSize += LastAdvance;
+          return true;
+        }
+        if (!CurState.IsRBP && CurState.NumRegs == 0 &&
+            CurState.CFAOff > LastState.CFAOff &&
+            CanFoldPE(PrologueSize, LastAdvance)) {
+          TState = ModeRSPBody;
+          DescState = CurState;
+          PrologueSize += LastAdvance;
+          return true;
+        }
+        break;
+      }
+
+      case ModeRSPSinglePush:
+        if (CurState.isRBPFrame()) {
+          // IsRBP moved from false to true => mov rbp, rsp.
+          if (LastAdvance != 3) {
+            dbgs() << "FAIL: unexpected mov rbp,rsp size: " << LastAdvance << "\n";
+            return false;
+          }
+          TState = ModeRBPNoCSR;
+          DescState = CurState;
+          PrologueSize += LastAdvance;
+          return true;
+        }
+        LLVM_FALLTHROUGH;
+      case ModeRSPPrologue:
+        if (!CurState.IsRBP && CurState.CFAOff == LastState.CFAOff + 1) {
+          // Single push. This can be store of a callee-saved register or just a
+          // push of an arbitrary register to subtract 8 from the stack pointer.
+          // We can't know this at here, because typically the information about
+          // which CSRs are stored is only provided at the end of the prologue.
+          if (LastAdvance != 1 && LastAdvance != 2) {
+            // Push instructions are 1 byte (rax-rdi) or 2 byte (r8-r15).
+            dbgs() << "unexpected push size: " << LastAdvance << "\n";
+            break;
+          }
+          TState = ModeRSPPrologue;
+          DescState = CurState;
+          PrologueSize += LastAdvance;
+          PrologueAdvances.push_back(LastAdvance);
+          assert(PrologueAdvances.size() + 2 == CurState.CFAOff &&
+                 "didn't record rsp prologue advance size?");
+          return true;
+        }
+        if (!CurState.IsRBP && CurState.CFAOff > LastState.CFAOff) {
+          if (LastAdvance != SubRspSize(CurState.CFAOff - LastState.CFAOff)) {
+            dbgs() << "unexpected sub rsp size: " << LastAdvance << "\n";
+            break;
+          }
+          TState = ModeRSPBody;
+          DescState = CurState;
+          PrologueSize += LastAdvance;
+          return true;
+        }
+        LLVM_FALLTHROUGH;
+      case ModeRSPBody:
+        dbgs() << "rspbody" << CurState.CFAOff << " " << LastState.CFAOff << CurState.NumRegs << "\n";
+        if (!CurState.IsRBP && CurState.CFAOff < LastState.CFAOff) {
+          // The frame size decreased, so we entered the epilogue. At this
+          // point, all CSRs must have been recorded in DescState.
+          if (LastState.NumRegs == CurState.CFAOff) {
+            // In case 1, this must be a single pop that decreases CFAOff.
+            if (CurState.CFAOff + 1 != LastState.CFAOff) {
+              dbgs() << "CFAOff NumRegs mismatch in case 1\n";
+              break;
+            }
+          } else if (LastState.NumRegs + 1 != CurState.CFAOff) {
+            // In case 2/3, there must be one slot for every reg + RIP.
+            dbgs() << "CFAOff NumRegs mismatch in case 2/3\n";
+            break;
+          }
+          TState = ModeRSPEpilogue;
+          return true;
+        }
+        if (!CurState.IsRBP && CurState.CFAOff == LastState.CFAOff) {
+          // No change?
+          return true;
+        }
+        dbgs() << "unhandled rsp body?\n";
+        LastState.print(MRI, dbgs());
+        break;
+
+      case ModeRSPEpilogue:
+        if (!CurState.IsRBP && CurState.CFAOff >= 1 &&
+            CurState.CFAOff + 1 == LastState.CFAOff &&
+            CanFoldPE(EpilogueSize, LastAdvance)) {
+          // Another pop.
+          if (LastAdvance != PushInstrSize(LastState.Regs[CurState.CFAOff - 1])) {
+            LastState.print(MRI, dbgs());
+              dbgs() << "advance epilogue for off size mismatch: " <<
+                     LastAdvance << " != " << PushInstrSize(LastState.Regs[CurState.CFAOff - 1]) << " " << CurState.Regs[CurState.CFAOff - 1] << " " << (CurState.CFAOff - 1) << "\n";
+            break;
+          }
+          EpilogueSize += LastAdvance;
+          return true;
+        }
+        if (LastState.isEmptyFrame()) {
+          if (CanFoldPE(EpilogueSize, LastAdvance)) {
+            EpilogueSize += LastAdvance;
+            if (CurState.isEmptyFrame())
+              return true;
+            // Go to flush descriptor code below *AFTER* inserting LastAdvance
+            // into the epilogue size.
+            break;
+          }
+        }
+        // We're at in or after an RSP epilogue. We cannot just hold a state
+        // from the middle of an RSP epilogue, so we must insert a new
+        // descriptor.
+        if (!FlushDesc())
+          return false;
+        DescStart = Prev;
+        DescState = LastState;
+        if (LastState.isEmptyFrame()) {
+          TState = ModeNULL;
+          goto modeNull;
+        }
+        break;
+
+      case ModeRBPNoCSR:
+        if (CurState.isRBPFrame() && CanFoldPE(PrologueSize, LastAdvance)) {
+          if (CurState.NumRegs > 1)
+            TState = ModeRBPWithCSR;
+          DescState = CurState;
+          PrologueSize += LastAdvance;
+          InnerPrologueSize += LastAdvance;
+          return true;
+        }
+        LLVM_FALLTHROUGH;
+      case ModeRBPWithCSR:
+        if (CurState.isRBPFrame() && CurState.NumRegs == LastState.NumRegs)
+          return true;
+        if (CurState.isEmptyFrame()) {
+          TState = ModeRBPEpilogue;
+          return true;
+        }
+        break;
+      case ModeRBPEpilogue:
+        assert(LastState.isEmptyFrame());
+        if (CanFoldPE(EpilogueSize, LastAdvance)) {
+          EpilogueSize += LastAdvance;
+          if (CurState.isEmptyFrame())
+            return true;
+          break;
+        }
+        if (!FlushDesc())
+          return false;
+        DescStart = Prev;
+        DescState = LastState;
+        TState = ModeNULL;
+        goto modeNull;
+      }
+
+      // Unable to fold new state into existing descriptor, need to start new
+      // descriptor.
+      if (!FlushDesc())
+        return false;
+
+      DescState = CurState;
+      LastState = CurState;
+      if (CurState.isEmptyFrame()) {
+        TState = ModeNULL;
+      } else if (CurState.isRBPFrame()) {
+        TState = CurState.NumRegs > 1 ? ModeRBPWithCSR : ModeRBPNoCSR;
+      } else if (!CurState.IsRBP && CurState.CFAOff == 2) {
+        TState = ModeRSPSinglePush;
+      } else if (!CurState.IsRBP && CurState.NumRegs < CurState.CFAOff) {
+        TState = ModeRSPBody;
+      } else {
+        dbgs() << "FAIL: unsupported advance\n";
+        return false;
+      }
+      return true;
+    };
+
+    for (const MCCFIInstruction &Inst : FI->Instructions) {
+      // dbgs() << "Sym " << Sym->getFragment() << " " << Sym->getOffset() << "\n";
+      assert(Inst.getLabel() != nullptr);
+      if (Cur->getFragment() != Inst.getLabel()->getFragment() ||
+          Cur->getOffset() != Inst.getLabel()->getOffset()) {
+        if (!Advance())
+          return false;
+
+        if (Cur->getFragment() == Inst.getLabel()->getFragment()) {
+          LastAdvance = Inst.getLabel()->getOffset() - Cur->getOffset();
+          assert(LastAdvance != 0 && "multiple CFI labels at same address?");
+        } else {
+          LastAdvance = 0;
+        }
+        LastState = CurState;
+        Prev = Cur;
+        Cur = Inst.getLabel();
+      }
+
+      switch (Inst.getOperation()) {
+      default:
+        dbgs() << "FAIL: Unhandled CFIInst " << (int)Inst.getOperation() << "\n";
+        return false; // No compact unwind encoding.
+      case MCCFIInstruction::OpDefCfaRegister: {
+        MCRegister Reg = *MRI.getLLVMRegNum(Inst.getRegister(), true);
+        if (Reg != X86::RBP && Reg != X86::RSP) {
+          dbgs() << "FAIL: unhandled cfa reg " << Inst.getRegister() << "\n";
+          return false;
+        }
+        CurState.IsRBP = Reg == X86::RBP;
+        break;
+      }
+      case MCCFIInstruction::OpAdjustCfaOffset:
+        CurState.CFAOff += uint64_t(Inst.getOffset()) / 8;
+        break;
+      case MCCFIInstruction::OpDefCfaOffset:
+        CurState.CFAOff = uint64_t(Inst.getOffset()) / 8;
+        break;
+      case MCCFIInstruction::OpDefCfa: {
+        MCRegister Reg = *MRI.getLLVMRegNum(Inst.getRegister(), true);
+        if (Reg != X86::RBP && Reg != X86::RSP) {
+          dbgs() << "FAIL: unhandled cfa reg " << Inst.getRegister() << "\n";
+          return false;
+        }
+        CurState.IsRBP = Reg == X86::RBP;
+        CurState.CFAOff = uint64_t(Inst.getOffset()) / 8;
+        break;
+      }
+      case MCCFIInstruction::OpRestore: {
+        // uint32_t Slot = uint32_t(-Inst.getOffset()) / 8 - 2;
+        MCRegister Reg = *MRI.getLLVMRegNum(Inst.getRegister(), true);
+        bool Reset = false;
+        for (MCRegister &StateReg : CurState.Regs) {
+          if (StateReg == Reg) {
+            StateReg = MCRegister{};
+            CurState.NumRegs--;
+            Reset = true;
+            break;
+          }
+        }
+        if (!Reset || Inst.getRegister() >= 16) {
+          dbgs() << "FAIL: unhandled restore " << Inst.getRegister() << "\n";
+          return false;
+        }
+        break;
+      }
+      case MCCFIInstruction::OpOffset: {
+        // Slot 0 = CFA-16, Slot 1 = CFA-24, etc.
+        uint32_t Slot = uint32_t(-Inst.getOffset()) / 8 - 2;
+        if (Slot >= CU_NUM_SAVED_REGS || Inst.getRegister() >= 16 || CurState.Regs[Slot].isValid()) {
+          dbgs() << "FAIL: unhandled offset " << Slot << " " << Inst.getRegister() << "\n";
+          return false;
+        }
+        CurState.NumRegs++;
+        CurState.Regs[Slot] = *MRI.getLLVMRegNum(Inst.getRegister(), true);
+        break;
+      }
+      }
+    }
+
+    // Advance to keep state of most recent CFI instructions.
+    if (!Advance())
+      return false;
+
+    // Advance further to the end of the function.
+    if (Cur->getFragment() == FI->End->getFragment()) {
+      LastAdvance = FI->End->getOffset() - Cur->getOffset();
+    } else {
+      LastAdvance = 0;
+    }
+    LastState = CurState;
+    Prev = Cur;
+    Cur = FI->End;
+
+    if (!Advance())
+      return false;
+    if (!FlushDesc())
+      return false;
+
+    return true;
+  }
+
+  /// Implementation of algorithm to g  rate the compact unwind encoding
   /// for the CFI instructions.
-  uint64_t generateCompactUnwindEncoding(const MCDwarfFrameInfo *FI,
+  uint64_t generateCompactUnwindEncoding(MCDwarfFrameInfo *FI,
                                          const MCContext *Ctxt) const override {
+    if (Ctxt->isELF()) {
+      dbgs() << "=========================================\n";;
+      if (generateELFCompactUnwindEncoding(FI, Ctxt))
+        return 0;
+      dbgs() << "Compact unwind failed\n";
+      FI->CompactUnwindEncoding.clear();
+      return CU::UNWIND_MODE_DWARF;
+    }
     ArrayRef<MCCFIInstruction> Instrs = FI->Instructions;
     if (Instrs.empty())
       return 0;

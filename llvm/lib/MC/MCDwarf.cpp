@@ -1595,8 +1595,9 @@ void FrameEmitterImpl::EmitCompactUnwind(const MCDwarfFrameInfo &Frame) {
   //   .quad __gxx_personality
   //   .quad except_tab1
 
-  uint32_t Encoding = Frame.CompactUnwindEncoding;
-  if (!Encoding) return;
+  if (Frame.CompactUnwindEncoding.size() != 1)
+    return;
+  uint32_t Encoding = Frame.CompactUnwindEncoding[0].Desc;
   bool DwarfEHFrameOnly = (Encoding == MOFI->getCompactUnwindDwarfEHFrameOnly());
 
   // The encoding needs to know we have an LSDA.
@@ -1763,7 +1764,7 @@ const MCSymbol &FrameEmitterImpl::emitCIE(const MCDwarfFrameInfo &Frame,
   // Initial Instructions
 
   const MCAsmInfo *MAI = context.getAsmInfo();
-  if (!Frame.IsSimple) {
+  if (!ElfCompactUnwindEligible && !Frame.IsSimple) {
     const std::vector<MCCFIInstruction> &Instructions =
         MAI->getInitialFrameState();
     emitCFIInstructions(Instructions, nullptr);
@@ -1844,9 +1845,16 @@ void FrameEmitterImpl::emitFDE(const MCSymbol &cieStart,
 
   if (frame.ElfCompactUnwindEligible) {
     // Emit the compact unwind descriptor.
-    // TODO: CompactUnwindEncoding is currently 32-bit. Extend it to 64-bit for
-    // information like prologue_start/epilogue_end/personality.
-    Streamer.emitInt64((frame.CompactUnwindEncoding << 32) | 1);
+    MCSymbol *Cur = frame.Begin;
+    for (auto [Idx, CU] : enumerate(frame.CompactUnwindEncoding)) {
+      // TODO: code alignment factor?
+      const MCExpr *Skip = makeEndMinusStartExpr(context, *Cur, *CU.Label, 0);
+      Streamer.emitULEB128Value(Skip);
+      // Optimization: omit last CU if it is zero.
+      if (CU.Desc != 0 || Idx + 1 != frame.CompactUnwindEncoding.size())
+        Streamer.emitInt64(CU.Desc);
+      Cur = CU.Label;
+    }
   } else {
     // Call Frame Instructions
     emitCFIInstructions(frame.Instructions, frame.Begin);
@@ -1936,13 +1944,13 @@ void MCDwarfFrameEmitter::Emit(MCObjectStreamer &Streamer, MCAsmBackend *MAB,
   if (IsEH && MOFI->getCompactUnwindSection()) {
     bool SectionEmitted = false;
     for (const MCDwarfFrameInfo &Frame : FrameArray) {
-      if (Frame.CompactUnwindEncoding == 0) continue;
+      if (Frame.CompactUnwindEncoding.empty()) continue;
       if (!SectionEmitted) {
         Streamer.switchSection(MOFI->getCompactUnwindSection());
         Streamer.emitValueToAlignment(Align(AsmInfo->getCodePointerSize()));
         SectionEmitted = true;
       }
-      NeedsEHFrameSection |= Frame.CompactUnwindEncoding !=
+      NeedsEHFrameSection |= Frame.CompactUnwindEncoding[0].Desc !=
                              MOFI->getCompactUnwindDwarfEHFrameOnly();
       Emitter.EmitCompactUnwind(Frame);
     }
@@ -1973,7 +1981,7 @@ void MCDwarfFrameEmitter::Emit(MCObjectStreamer &Streamer, MCAsmBackend *MAB,
   for (auto I = FrameArrayX.begin(), E = FrameArrayX.end(); I != E;) {
     const MCDwarfFrameInfo &Frame = *I;
     ++I;
-    if (CanOmitDwarf && Frame.CompactUnwindEncoding !=
+    if (CanOmitDwarf && Frame.CompactUnwindEncoding[0].Desc !=
           MOFI->getCompactUnwindDwarfEHFrameOnly() && IsEH)
       // CIEs and FDEs can be emitted in either the eh_frame section or the
       // debug_frame section, on some platforms (e.g. AArch64) the target object

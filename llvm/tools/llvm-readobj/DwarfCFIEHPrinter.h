@@ -233,8 +233,9 @@ void PrinterContext<ELFT>::printEHFrame(const Elf_Shdr *EHFrameShdr) const {
           "address_range: 0x%" PRIx64 " (end : 0x%" PRIx64 ")\n",
           FDE->getAddressRange(),
           FDE->getInitialLocation() + FDE->getAddressRange());
-      if (auto Desc = FDE->getUnwindDescriptor()) {
-        W.startLine() << format("unwind_descriptor: 0x%" PRIx64 "\n", Desc);
+      if (auto CUs = FDE->getCompactUnwind(); !CUs.empty()) {
+        for (const dwarf::FDECompactUnwind &CU : CUs)
+          W.startLine() << format("unwind_descriptor: +%016" PRIx64 " %016" PRIx64 "\n", CU.Skip, CU.Desc);
         UnwindDescriptor = true;
       }
     }

@@ -1252,25 +1252,25 @@ void TargetLibraryInfoImpl::addVectorizableFunctions(ArrayRef<VecDesc> Fns) {
   llvm::sort(ScalarDescs, compareByVectorFnName);
 }
 
-static const VecDesc VecFuncs_Accelerate[] = {
+static constexpr VecDesc VecFuncs_Accelerate[] = {
 #define TLI_DEFINE_ACCELERATE_VECFUNCS
 #include "llvm/Analysis/VecFuncs.def"
 #undef TLI_DEFINE_ACCELERATE_VECFUNCS
 };
 
-static const VecDesc VecFuncs_DarwinLibSystemM[] = {
+static constexpr VecDesc VecFuncs_DarwinLibSystemM[] = {
 #define TLI_DEFINE_DARWIN_LIBSYSTEM_M_VECFUNCS
 #include "llvm/Analysis/VecFuncs.def"
 #undef TLI_DEFINE_DARWIN_LIBSYSTEM_M_VECFUNCS
 };
 
-static const VecDesc VecFuncs_LIBMVEC_X86[] = {
+static constexpr VecDesc VecFuncs_LIBMVEC_X86[] = {
 #define TLI_DEFINE_LIBMVEC_X86_VECFUNCS
 #include "llvm/Analysis/VecFuncs.def"
 #undef TLI_DEFINE_LIBMVEC_X86_VECFUNCS
 };
 
-static const VecDesc VecFuncs_LIBMVEC_AARCH64[] = {
+static constexpr VecDesc VecFuncs_LIBMVEC_AARCH64[] = {
 #define TLI_DEFINE_LIBMVEC_AARCH64_VECFUNCS
 #define TLI_DEFINE_VECFUNC(SCAL, VEC, VF, MASK, VABI_PREFIX, CC)               \
   {SCAL, VEC, VF, MASK, VABI_PREFIX, CC},
@@ -1278,33 +1278,33 @@ static const VecDesc VecFuncs_LIBMVEC_AARCH64[] = {
 #undef TLI_DEFINE_LIBMVEC_AARCH64_VECFUNCS
 };
 
-static const VecDesc VecFuncs_MASSV[] = {
+static constexpr VecDesc VecFuncs_MASSV[] = {
 #define TLI_DEFINE_MASSV_VECFUNCS
 #include "llvm/Analysis/VecFuncs.def"
 #undef TLI_DEFINE_MASSV_VECFUNCS
 };
 
-static const VecDesc VecFuncs_SVML[] = {
+static constexpr VecDesc VecFuncs_SVML[] = {
 #define TLI_DEFINE_SVML_VECFUNCS
 #include "llvm/Analysis/VecFuncs.def"
 #undef TLI_DEFINE_SVML_VECFUNCS
 };
 
-static const VecDesc VecFuncs_SLEEFGNUABI_VF2[] = {
+static constexpr VecDesc VecFuncs_SLEEFGNUABI_VF2[] = {
 #define TLI_DEFINE_SLEEFGNUABI_VF2_VECFUNCS
 #define TLI_DEFINE_VECFUNC(SCAL, VEC, VF, VABI_PREFIX)                         \
   {SCAL, VEC, VF, /* MASK = */ false, VABI_PREFIX, /* CC = */ std::nullopt},
 #include "llvm/Analysis/VecFuncs.def"
 #undef TLI_DEFINE_SLEEFGNUABI_VF2_VECFUNCS
 };
-static const VecDesc VecFuncs_SLEEFGNUABI_VF4[] = {
+static constexpr VecDesc VecFuncs_SLEEFGNUABI_VF4[] = {
 #define TLI_DEFINE_SLEEFGNUABI_VF4_VECFUNCS
 #define TLI_DEFINE_VECFUNC(SCAL, VEC, VF, VABI_PREFIX)                         \
   {SCAL, VEC, VF, /* MASK = */ false, VABI_PREFIX, /* CC = */ std::nullopt},
 #include "llvm/Analysis/VecFuncs.def"
 #undef TLI_DEFINE_SLEEFGNUABI_VF4_VECFUNCS
 };
-static const VecDesc VecFuncs_SLEEFGNUABI_VFScalable[] = {
+static constexpr VecDesc VecFuncs_SLEEFGNUABI_VFScalable[] = {
 #define TLI_DEFINE_SLEEFGNUABI_SCALABLE_VECFUNCS
 #define TLI_DEFINE_VECFUNC(SCAL, VEC, VF, MASK, VABI_PREFIX)                   \
   {SCAL, VEC, VF, MASK, VABI_PREFIX, /* CC = */ std::nullopt},
@@ -1312,7 +1312,7 @@ static const VecDesc VecFuncs_SLEEFGNUABI_VFScalable[] = {
 #undef TLI_DEFINE_SLEEFGNUABI_SCALABLE_VECFUNCS
 };
 
-static const VecDesc VecFuncs_SLEEFGNUABI_VFScalableRISCV[] = {
+static constexpr VecDesc VecFuncs_SLEEFGNUABI_VFScalableRISCV[] = {
 #define TLI_DEFINE_SLEEFGNUABI_SCALABLE_VECFUNCS_RISCV
 #define TLI_DEFINE_VECFUNC(SCAL, VEC, VF, MASK, VABI_PREFIX)                   \
   {SCAL, VEC, VF, MASK, VABI_PREFIX, /* CC = */ std::nullopt},
@@ -1320,7 +1320,7 @@ static const VecDesc VecFuncs_SLEEFGNUABI_VFScalableRISCV[] = {
 #undef TLI_DEFINE_SLEEFGNUABI_SCALABLE_VECFUNCS_RISCV
 };
 
-static const VecDesc VecFuncs_ArmPL[] = {
+static constexpr VecDesc VecFuncs_ArmPL[] = {
 #define TLI_DEFINE_ARMPL_VECFUNCS
 #define TLI_DEFINE_VECFUNC(SCAL, VEC, VF, MASK, VABI_PREFIX, CC)               \
   {SCAL, VEC, VF, MASK, VABI_PREFIX, CC},
@@ -1328,7 +1328,7 @@ static const VecDesc VecFuncs_ArmPL[] = {
 #undef TLI_DEFINE_ARMPL_VECFUNCS
 };
 
-const VecDesc VecFuncs_AMDLIBM[] = {
+static constexpr VecDesc VecFuncs_AMDLIBM[] = {
 #define TLI_DEFINE_AMDLIBM_VECFUNCS
 #define TLI_DEFINE_VECFUNC(SCAL, VEC, VF, MASK, VABI_PREFIX)                   \
   {SCAL, VEC, VF, MASK, VABI_PREFIX, /* CC = */ std::nullopt},

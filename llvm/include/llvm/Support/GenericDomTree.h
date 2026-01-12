@@ -29,6 +29,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/RecyclingAllocator.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CFGDiff.h"
 #include "llvm/Support/CFGUpdate.h"
@@ -269,7 +270,8 @@ protected:
   DomTreeNodeBase<NodeT> *RootNode = nullptr;
   ParentPtr Parent = nullptr;
 
-  SpecificBumpPtrAllocator<DomTreeNodeBase<NodeT>> NodeAllocator;
+  //SpecificBumpPtrAllocator<DomTreeNodeBase<NodeT>> NodeAllocator;
+  RecyclingAllocator<BumpPtrAllocator, DomTreeNodeBase<NodeT>> NodeRecycler;
 
   mutable bool DFSInfoValid = false;
   mutable unsigned int SlowQueries = 0;
@@ -279,11 +281,12 @@ protected:
 
  public:
   DominatorTreeBase() = default;
+  ~DominatorTreeBase() { wipe(); }
 
   DominatorTreeBase(DominatorTreeBase &&Arg)
       : Roots(std::move(Arg.Roots)), DomTreeNodes(std::move(Arg.DomTreeNodes)),
         NodeNumberMap(std::move(Arg.NodeNumberMap)), RootNode(Arg.RootNode),
-        Parent(Arg.Parent), NodeAllocator(std::move(Arg.NodeAllocator)),
+        Parent(Arg.Parent), NodeRecycler(std::move(Arg.NodeRecycler)),
         DFSInfoValid(Arg.DFSInfoValid), SlowQueries(Arg.SlowQueries),
         BlockNumberEpoch(Arg.BlockNumberEpoch) {
     Arg.wipe();
@@ -297,7 +300,7 @@ protected:
     NodeNumberMap = std::move(RHS.NodeNumberMap);
     RootNode = RHS.RootNode;
     Parent = RHS.Parent;
-    NodeAllocator = std::move(RHS.NodeAllocator);
+    NodeRecycler = std::move(RHS.NodeRecycler);
     DFSInfoValid = RHS.DFSInfoValid;
     SlowQueries = RHS.SlowQueries;
     BlockNumberEpoch = RHS.BlockNumberEpoch;
@@ -759,6 +762,8 @@ public:
     }
 
     DomTreeNodes[*IdxOpt] = nullptr;
+    std::destroy_at(Node);
+    NodeRecycler.Deallocate(Node);
     if constexpr (!GraphHasNodeNumbers<NodeT *>)
       NodeNumberMap.erase(BB);
 
@@ -911,6 +916,11 @@ public:
   }
 
   void reset() {
+    for (auto *Node : DomTreeNodes)
+      if (Node) {
+        std::destroy_at(Node);
+        NodeRecycler.Deallocate(Node);
+      }
     DomTreeNodes.clear();
     if constexpr (!GraphHasNodeNumbers<NodeT *>)
       NodeNumberMap.clear();
@@ -918,7 +928,6 @@ public:
     RootNode = nullptr;
     Parent = nullptr;
     DFSInfoValid = false;
-    NodeAllocator.DestroyAll();
     SlowQueries = 0;
   }
 
@@ -928,7 +937,7 @@ protected:
   DomTreeNodeBase<NodeT> *createNode(NodeT *BB,
                                      DomTreeNodeBase<NodeT> *IDom = nullptr) {
     auto *Node =
-        new (NodeAllocator.Allocate()) DomTreeNodeBase<NodeT>(BB, IDom);
+        new (NodeRecycler.Allocate()) DomTreeNodeBase<NodeT>(BB, IDom);
     unsigned NodeIdx = getNodeIndexForInsert(BB);
     DomTreeNodes[NodeIdx] = Node;
     if (IDom)
@@ -1013,12 +1022,16 @@ protected:
   /// This is essentially a post-move helper only. It leaves the object in an
   /// assignable and destroyable state, but otherwise invalid.
   void wipe() {
+    for (auto *Node : DomTreeNodes)
+      if (Node) {
+        std::destroy_at(Node);
+        NodeRecycler.Deallocate(Node);
+      }
     DomTreeNodes.clear();
     if constexpr (!GraphHasNodeNumbers<NodeT *>)
       NodeNumberMap.clear();
     RootNode = nullptr;
     Parent = nullptr;
-    NodeAllocator.DestroyAll();
   }
 };
 

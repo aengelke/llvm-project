@@ -34,7 +34,11 @@ private:
   AllocatorType Allocator;
 
 public:
+  RecyclingAllocator() = default;
   ~RecyclingAllocator() { Base.clear(Allocator); }
+
+  RecyclingAllocator(RecyclingAllocator &&) = default;
+  RecyclingAllocator &operator=(RecyclingAllocator&&) = default;
 
   /// Allocate - Return a pointer to storage for an object of type
   /// SubClass. The storage may be either newly allocated or recycled.

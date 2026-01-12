@@ -68,6 +68,12 @@ public:
       : FreeList(std::exchange(Other.FreeList, nullptr)) {}
   Recycler() = default;
 
+  Recycler &operator=(Recycler &&Other) {
+    FreeList = Other.FreeList;
+    Other.FreeList = nullptr;
+    return *this;
+  }
+
   /// clear - Release all the tracked allocations to the allocator. The
   /// recycler must be free of any tracked allocations before being
   /// deleted; calling clear is one way to ensure this.

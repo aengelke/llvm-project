@@ -48,6 +48,9 @@ protected:
   }
   LLVM_ABI ~GlobalObject();
 
+  friend class Value;
+  unsigned MetadataIndex = 0;
+
   Comdat *ObjComdat = nullptr;
   enum {
     LastAlignmentBit = 5,

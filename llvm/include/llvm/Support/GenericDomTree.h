@@ -763,8 +763,6 @@ public:
     DomTreeNodeBase<NodeT> *Node = DomTreeNodes[*IdxOpt];
     assert(Node->isLeaf() && "Node is not a leaf node.");
 
-    DFSInfoValid = false;
-
     // Remove node from immediate dominator's children list.
     if (DomTreeNodeBase<NodeT> *IDom = Node->getIDom())
       IDom->removeChild(Node);

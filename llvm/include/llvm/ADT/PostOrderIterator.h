@@ -16,6 +16,7 @@
 #ifndef LLVM_ADT_POSTORDERITERATOR_H
 #define LLVM_ADT_POSTORDERITERATOR_H
 
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/GraphTraits.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -94,7 +95,7 @@ public:
 namespace po_detail {
 
 template <typename NodeRef> class NumberSet {
-  SmallVector<bool> Data;
+  BitVector Data;
 
 public:
   void reserve(size_t Size) {

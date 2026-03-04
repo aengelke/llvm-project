@@ -151,16 +151,7 @@ void x86::getX86TargetFeatures(const Driver &D, const llvm::Triple &Triple,
   }
 
   const llvm::Triple::ArchType ArchType = Triple.getArch();
-  bool HasEGPR = false;
-
-  // -ffixed-r16 through -ffixed-r31 are only valid when the selected x86_64
-  // CPU enables APX EGPR by default; later -target-feature arguments still get
-  // their own validation when translated to backend features.
-  if (ArchType == llvm::Triple::x86_64) {
-    SmallVector<StringRef, 16> CPUFeatures;
-    llvm::X86::getFeaturesForCPU(getX86TargetCPU(D, Args, Triple), CPUFeatures);
-    HasEGPR = llvm::is_contained(CPUFeatures, "+egpr");
-  }
+  std::optional<bool> HasEGPR;
 
   // Add features to be compatible with gcc for Android.
   if (Triple.isAndroid()) {
@@ -366,9 +357,23 @@ void x86::getX86TargetFeatures(const Driver &D, const llvm::Triple &Triple,
   RESERVE_REG(r13)
   RESERVE_REG(r14)
   RESERVE_REG(r15)
+#undef RESERVE_REG
+
+  bool NeedDetectEGPR = Args.hasArg(
+      options::OPT_ffixed_r16, options::OPT_ffixed_r17, options::OPT_ffixed_r18,
+      options::OPT_ffixed_r19, options::OPT_ffixed_r20, options::OPT_ffixed_r21,
+      options::OPT_ffixed_r22, options::OPT_ffixed_r23, options::OPT_ffixed_r24,
+      options::OPT_ffixed_r25, options::OPT_ffixed_r26, options::OPT_ffixed_r27,
+      options::OPT_ffixed_r28, options::OPT_ffixed_r29, options::OPT_ffixed_r30,
+      options::OPT_ffixed_r31);
+  if (NeedDetectEGPR && !HasEGPR && ArchType == llvm::Triple::x86_64) {
+    SmallVector<StringRef, 16> CPUFeatures;
+    llvm::X86::getFeaturesForCPU(getX86TargetCPU(D, Args, Triple), CPUFeatures);
+    HasEGPR = llvm::is_contained(CPUFeatures, "+egpr");
+  }
 #define RESERVE_EGPR(REG)                                                      \
   if (Args.hasArg(options::OPT_ffixed_##REG)) {                                \
-    if (!HasEGPR)                                                              \
+    if (!HasEGPR.value_or(false))                                              \
       D.Diag(diag::err_drv_unsupported_opt_for_target)                         \
           << "-ffixed-" #REG << Triple.getTriple();                            \
     else                                                                       \
@@ -391,5 +396,4 @@ void x86::getX86TargetFeatures(const Driver &D, const llvm::Triple &Triple,
   RESERVE_EGPR(r30)
   RESERVE_EGPR(r31)
 #undef RESERVE_EGPR
-#undef RESERVE_REG
 }

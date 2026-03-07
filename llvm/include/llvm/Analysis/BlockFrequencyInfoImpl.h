@@ -857,10 +857,21 @@ template <class BT> class BlockFrequencyInfoImpl : BlockFrequencyInfoImplBase {
   const FunctionT *F = nullptr;
 
   // All blocks in reverse postorder.
-  std::vector<BFICallbackVH> RPOT;
+  std::vector<const BlockT *> RPOT;
   DenseMap<const BlockT *, BlockNode> Nodes;
 
-  BlockNode getNode(const BlockT *BB) const { return Nodes.lookup(BB); }
+  BlockNode getNode(const BlockT *BB) const {
+#ifdef EXPENSIVE_CHECKS
+    // Try to catch cases where blocks were deleted (use-after-free can be
+    // caught by ASan) or moved to a different function, but the BFI was not
+    // updated. This is an asymptotically expensive check.
+    for (auto Node : RPOT)
+      assert((!Node || Node->getParent() == F) &&
+             "BFI stores basic block outside of function, missing update!");
+#endif
+    assert(BB->getParent() == F && "block must be in same function");
+    return Nodes.lookup(BB);
+  }
 
   const BlockT *getBlock(const BlockNode &Node) const {
     assert(Node.Index < RPOT.size());
@@ -1021,13 +1032,14 @@ public:
   void setBlockFreq(const BlockT *BB, BlockFrequency Freq);
 
   void forgetBlock(const BlockT *BB) {
+    assert(BB->getParent() == F && "block must be in same function");
     // We don't erase corresponding items from `Freqs`, `RPOT` and other to
     // avoid invalidating indices. Doing so would have saved some memory, but
     // it's not worth it.
-    auto It = Nodes.find(BB);
-    assert(It != Nodes.end() && "cannot forget block that was never seen");
-    RPOT[It->second.Index] = {}; // Clear value handle.
-    Nodes.erase(It);
+    if (auto It = Nodes.find(BB); It != Nodes.end()) {
+      RPOT[It->second.Index] = nullptr;
+      Nodes.erase(It);
+    }
   }
 
   Scaled64 getFloatingBlockFreq(const BlockT *BB) const {
@@ -1148,7 +1160,7 @@ void BlockFrequencyInfoImpl<BT>::setBlockFreq(const BlockT *BB,
     BlockNode NewNode(Freqs.size());
     It->second = NewNode;
     Freqs.emplace_back();
-    RPOT.emplace_back(BB, this);
+    RPOT.emplace_back(BB);
     BlockFrequencyInfoImplBase::setBlockFreq(NewNode, Freq);
   }
 }
@@ -1157,7 +1169,7 @@ template <class BT> void BlockFrequencyInfoImpl<BT>::initializeRPOT() {
   const BlockT *Entry = &F->front();
   RPOT.reserve(F->size());
   for (const BlockT *BB : post_order(Entry))
-    RPOT.emplace_back(BB, this);
+    RPOT.emplace_back(BB);
   std::reverse(RPOT.begin(), RPOT.end());
 
   assert(RPOT.size() - 1 <= BlockNode::getMaxIndex() &&

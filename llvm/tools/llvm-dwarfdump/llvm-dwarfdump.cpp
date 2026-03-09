@@ -886,13 +886,13 @@ int main(int argc, char **argv) {
     return 1;
   }
   // -error-detail and -json-summary-file both imply -verify
-  if (ErrorDetails != Unspecified || !JsonErrSummaryFile->empty()) {
+  if (ErrorDetails != Unspecified || !JsonErrSummaryFile.empty()) {
     Verify = true;
   }
 
   std::error_code EC;
-  ToolOutputFile OutputFile(*OutputFilename, EC, sys::fs::OF_TextWithCRLF);
-  error("unable to open output file " + *OutputFilename, EC);
+  ToolOutputFile OutputFile(OutputFilename, EC, sys::fs::OF_TextWithCRLF);
+  error("unable to open output file " + OutputFilename, EC);
   // Don't remove output file if we exit with an error.
   OutputFile.keep();
 

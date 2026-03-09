@@ -1504,6 +1504,153 @@ public:
   DataType &operator*() const { return getValue(); }
 };
 
+// Specialization for std::string that preserves the pre-TLS calling convention.
+// The old opt_storage inherited from std::string, so cl::opt<std::string> was
+// usable as a std::string directly. With TLS, the value lives elsewhere, so we
+// provide conversion operators and forwarded members to keep call sites intact.
+// The sole implicit conversion is to StringRef, which avoids the ambiguity that
+// arises when both operator std::string&() and operator StringRef() exist (e.g.
+// raw_ostream has overloads for both). Since StringRef implicitly converts to
+// Twine and std::string_view, this single conversion handles most use cases.
+template <> class opt_storage<std::string, false> {
+  const OptionStorageHandle Storage;
+  OptionValue<std::string> Default;
+
+  std::string *getLocation() const {
+    return reinterpret_cast<std::string *>(
+        getOptionStorage(Storage.Offset, Storage.Impl));
+  }
+
+public:
+  opt_storage()
+      : Storage(registerOptionStorage(
+            std::make_shared<OptionStorageInfo<std::string>>())) {}
+
+  template <class T> void setValue(const T &V, bool initial = false) {
+    *getLocation() = V;
+    if (initial)
+      Default = V;
+  }
+
+  std::string &getValue() const { return *getLocation(); }
+
+  const OptionValue<std::string> &getDefault() const { return Default; }
+
+  std::string *operator->() const { return getLocation(); }
+  std::string &operator*() const { return getValue(); }
+
+  operator StringRef() const { return getValue(); }
+  operator std::string &() const { return getValue(); }
+  operator Twine() const { return Twine(getValue()); }
+
+  bool empty() const { return getLocation()->empty(); }
+  const char *c_str() const { return getLocation()->c_str(); }
+  const char *data() const { return getLocation()->data(); }
+  size_t size() const { return getLocation()->size(); }
+  size_t length() const { return getLocation()->length(); }
+  size_t find(const char *S, size_t Pos = 0) const {
+    return getLocation()->find(S, Pos);
+  }
+  size_t find(char C, size_t Pos = 0) const {
+    return getLocation()->find(C, Pos);
+  }
+  std::string substr(size_t Pos = 0,
+                     size_t Count = std::string::npos) const {
+    return getLocation()->substr(Pos, Count);
+  }
+  bool starts_with(StringRef Prefix) const {
+    return StringRef(getValue()).starts_with(Prefix);
+  }
+  bool ends_with(StringRef Suffix) const {
+    return StringRef(getValue()).ends_with(Suffix);
+  }
+  bool contains(StringRef S) const {
+    return StringRef(getValue()).contains(S);
+  }
+  std::string &erase(size_t Pos = 0, size_t Count = std::string::npos) {
+    return getLocation()->erase(Pos, Count);
+  }
+  char &operator[](size_t Idx) { return (*getLocation())[Idx]; }
+  char operator[](size_t Idx) const { return (*getLocation())[Idx]; }
+
+  std::string &operator+=(StringRef RHS) { return *getLocation() += RHS; }
+  std::string &operator+=(const char *RHS) { return *getLocation() += RHS; }
+  std::string &operator+=(char C) { return *getLocation() += C; }
+
+  opt_storage &operator=(const std::string &V) {
+    *getLocation() = V;
+    return *this;
+  }
+  opt_storage &operator=(std::string &&V) {
+    *getLocation() = std::move(V);
+    return *this;
+  }
+  opt_storage &operator=(const char *V) {
+    *getLocation() = V;
+    return *this;
+  }
+  opt_storage &operator=(StringRef V) {
+    *getLocation() = V.str();
+    return *this;
+  }
+
+  friend raw_ostream &operator<<(raw_ostream &OS, const opt_storage &O) {
+    return OS << StringRef(O.getValue());
+  }
+
+  friend bool operator==(const opt_storage &LHS, const opt_storage &RHS) {
+    return LHS.getValue() == RHS.getValue();
+  }
+  friend bool operator!=(const opt_storage &LHS, const opt_storage &RHS) {
+    return LHS.getValue() != RHS.getValue();
+  }
+  friend bool operator==(const opt_storage &LHS, const char *RHS) {
+    return LHS.getValue() == RHS;
+  }
+  friend bool operator==(const char *LHS, const opt_storage &RHS) {
+    return LHS == RHS.getValue();
+  }
+  friend bool operator!=(const opt_storage &LHS, const char *RHS) {
+    return LHS.getValue() != RHS;
+  }
+  friend bool operator!=(const char *LHS, const opt_storage &RHS) {
+    return LHS != RHS.getValue();
+  }
+  friend bool operator==(const opt_storage &LHS, StringRef RHS) {
+    return StringRef(LHS.getValue()) == RHS;
+  }
+  friend bool operator==(StringRef LHS, const opt_storage &RHS) {
+    return LHS == StringRef(RHS.getValue());
+  }
+  friend bool operator!=(const opt_storage &LHS, StringRef RHS) {
+    return StringRef(LHS.getValue()) != RHS;
+  }
+  friend bool operator!=(StringRef LHS, const opt_storage &RHS) {
+    return LHS != StringRef(RHS.getValue());
+  }
+
+  friend std::string operator+(const opt_storage &LHS, const char *RHS) {
+    return LHS.getValue() + RHS;
+  }
+  friend std::string operator+(const char *LHS, const opt_storage &RHS) {
+    return LHS + RHS.getValue();
+  }
+  friend std::string operator+(const opt_storage &LHS,
+                               const std::string &RHS) {
+    return LHS.getValue() + RHS;
+  }
+  friend std::string operator+(const std::string &LHS,
+                               const opt_storage &RHS) {
+    return LHS + RHS.getValue();
+  }
+  friend std::string operator+(const opt_storage &LHS, StringRef RHS) {
+    return LHS.getValue() + RHS.str();
+  }
+  friend std::string operator+(StringRef LHS, const opt_storage &RHS) {
+    return LHS.str() + RHS.getValue();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // A scalar command line option.
 //

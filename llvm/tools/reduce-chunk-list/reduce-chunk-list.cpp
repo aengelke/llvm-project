@@ -38,7 +38,7 @@ bool isStillInteresting(ArrayRef<IntegerInclusiveInterval> Chunks) {
   errs() << "Checking with: " << ChunkStr << "\n";
 
   std::vector<StringRef> Argv;
-  Argv.push_back(ReproductionCmd);
+  Argv.push_back(*ReproductionCmd);
   Argv.push_back(ChunkStr);
 
   std::string ErrMsg;
@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
   cl::ParseCommandLineOptions(argc, argv);
 
   auto ExpectedChunks =
-      IntegerInclusiveIntervalUtils::parseIntervals(StartChunks, ',');
+      IntegerInclusiveIntervalUtils::parseIntervals(*StartChunks, ',');
   if (!ExpectedChunks) {
     handleAllErrors(ExpectedChunks.takeError(), [](const StringError &E) {
       errs() << "Error parsing chunks: " << E.getMessage() << "\n";
@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
   IntegerInclusiveIntervalUtils::IntervalList CurrChunks =
       std::move(*ExpectedChunks);
 
-  auto Program = sys::findProgramByName(ReproductionCmd);
+  auto Program = sys::findProgramByName(*ReproductionCmd);
   if (!Program) {
     errs() << "failed to find command : " << ReproductionCmd << "\n";
     return 1;

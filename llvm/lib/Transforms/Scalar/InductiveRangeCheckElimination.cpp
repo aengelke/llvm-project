@@ -926,6 +926,7 @@ PreservedAnalyses IRCEPass::run(Function &F, FunctionAnalysisManager &AM) {
 
     if (CFGChanged && !SkipProfitabilityChecks) {
       PreservedAnalyses PA = PreservedAnalyses::all();
+      PA.abandon<BranchProbabilityAnalysis>();
       PA.abandon<BlockFrequencyAnalysis>();
       AM.invalidate(F, PA);
     }
@@ -944,6 +945,7 @@ PreservedAnalyses IRCEPass::run(Function &F, FunctionAnalysisManager &AM) {
       Changed = true;
       if (!SkipProfitabilityChecks) {
         PreservedAnalyses PA = PreservedAnalyses::all();
+        PA.abandon<BranchProbabilityAnalysis>();
         PA.abandon<BlockFrequencyAnalysis>();
         AM.invalidate(F, PA);
       }

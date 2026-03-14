@@ -1051,10 +1051,7 @@ bool BranchProbabilityInfo::calcFloatingPointHeuristics(const BasicBlock *BB) {
   return true;
 }
 
-void BranchProbabilityInfo::releaseMemory() {
-  Probs.clear();
-  Handles.clear();
-}
+void BranchProbabilityInfo::releaseMemory() { Probs.clear(); }
 
 bool BranchProbabilityInfo::invalidate(Function &, const PreservedAnalyses &PA,
                                        FunctionAnalysisManager::Invalidator &) {
@@ -1133,7 +1130,6 @@ void BranchProbabilityInfo::setEdgeProbability(
   if (Probs.size() == 0)
     return; // Nothing to set.
 
-  Handles.insert(BasicBlockCallbackVH(Src, this));
   uint64_t TotalNumerator = 0;
   for (unsigned SuccIdx = 0; SuccIdx < Probs.size(); ++SuccIdx) {
     this->Probs[std::make_pair(Src, SuccIdx)] = Probs[SuccIdx];
@@ -1163,7 +1159,6 @@ void BranchProbabilityInfo::copyEdgeProbabilities(BasicBlock *Src,
   if (!this->Probs.contains(std::make_pair(Src, 0)))
     return; // No probability is set for edges from Src. Keep the same for Dst.
 
-  Handles.insert(BasicBlockCallbackVH(Dst, this));
   for (unsigned SuccIdx = 0; SuccIdx < NumSuccessors; ++SuccIdx) {
     auto Prob = this->Probs[std::make_pair(Src, SuccIdx)];
     this->Probs[std::make_pair(Dst, SuccIdx)] = Prob;
@@ -1207,7 +1202,6 @@ void BranchProbabilityInfo::eraseBlock(const BasicBlock *BB) {
   // a pair (BB, N) if there is no data for (BB, N-1) because the data is always
   // set for all successors from 0 to M at once by the method
   // setEdgeProbability().
-  Handles.erase(BasicBlockCallbackVH(BB, this));
   for (unsigned I = 0;; ++I) {
     auto MapI = Probs.find(std::make_pair(BB, I));
     if (MapI == Probs.end()) {

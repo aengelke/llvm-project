@@ -122,23 +122,16 @@ public:
   }
 
   BranchProbabilityInfo(BranchProbabilityInfo &&Arg)
-      : Handles(std::move(Arg.Handles)), Probs(std::move(Arg.Probs)),
-        LastF(Arg.LastF),
-        EstimatedBlockWeight(std::move(Arg.EstimatedBlockWeight)) {
-    for (auto &Handle : Handles)
-      Handle.setBPI(this);
-  }
+      : Probs(std::move(Arg.Probs)), LastF(Arg.LastF),
+        EstimatedBlockWeight(std::move(Arg.EstimatedBlockWeight)) {}
 
   BranchProbabilityInfo(const BranchProbabilityInfo &) = delete;
   BranchProbabilityInfo &operator=(const BranchProbabilityInfo &) = delete;
 
   BranchProbabilityInfo &operator=(BranchProbabilityInfo &&RHS) {
     releaseMemory();
-    Handles = std::move(RHS.Handles);
     Probs = std::move(RHS.Probs);
     EstimatedBlockWeight = std::move(RHS.EstimatedBlockWeight);
-    for (auto &Handle : Handles)
-      Handle.setBPI(this);
     return *this;
   }
 
@@ -277,23 +270,6 @@ public:
   };
 
 private:
-  // We need to store CallbackVH's in order to correctly handle basic block
-  // removal.
-  class BasicBlockCallbackVH final : public CallbackVH {
-    BranchProbabilityInfo *BPI;
-
-    void deleted() override {
-      assert(BPI != nullptr);
-      BPI->eraseBlock(cast<BasicBlock>(getValPtr()));
-    }
-
-  public:
-    void setBPI(BranchProbabilityInfo *BPI) { this->BPI = BPI; }
-
-    BasicBlockCallbackVH(const Value *V, BranchProbabilityInfo *BPI = nullptr)
-        : CallbackVH(const_cast<Value *>(V)), BPI(BPI) {}
-  };
-
   /// Pair of Loop and SCC ID number. Used to unify handling of normal and
   /// SCC based loop representations.
   using LoopData = std::pair<Loop *, int>;
@@ -322,8 +298,6 @@ private:
 
   // Pair of LoopBlocks representing an edge from first to second block.
   using LoopEdge = std::pair<const LoopBlock &, const LoopBlock &>;
-
-  DenseSet<BasicBlockCallbackVH, DenseMapInfo<Value*>> Handles;
 
   // Since we allow duplicate edges from one basic block to another, we use
   // a pair (PredBlock and an index in the successors) to specify an edge.

@@ -504,29 +504,13 @@ public:
     if (!isReachableFromEntry(A))
       return false;
 
-    if (B->getIDom() == A) return true;
-
-    if (A->getIDom() == B) return false;
-
-    // A can only dominate B if it is higher in the tree.
-    if (A->getLevel() >= B->getLevel()) return false;
-
-    // Compare the result of the tree walk and the dfs numbers, if expensive
-    // checks are enabled.
+    if (LLVM_LIKELY(DFSInfoValid)) {
+      // Compare the result of the tree walk and the dfs numbers, if expensive
+      // checks are enabled.
 #ifdef EXPENSIVE_CHECKS
-    assert((!DFSInfoValid ||
-            (dominatedBySlowTreeWalk(A, B) == B->DominatedBy(A))) &&
-           "Tree walk disagrees with dfs numbers!");
+      assert(dominatedBySlowTreeWalk(A, B) == B->DominatedBy(A) &&
+             "Tree walk disagrees with dfs numbers!");
 #endif
-
-    if (DFSInfoValid)
-      return B->DominatedBy(A);
-
-    // If we end up with too many slow queries, just update the
-    // DFS numbers on the theory that we are going to keep querying.
-    SlowQueries++;
-    if (SlowQueries > 32) {
-      updateDFSNumbers();
       return B->DominatedBy(A);
     }
 
@@ -1012,7 +996,25 @@ protected:
     assert(isReachableFromEntry(B));
     assert(isReachableFromEntry(A));
 
+    if (B->getIDom() == A)
+      return true;
+
+    if (A->getIDom() == B)
+      return false;
+
+    // A can only dominate B if it is higher in the tree.
     const unsigned ALevel = A->getLevel();
+    if (ALevel >= B->getLevel())
+      return false;
+
+    // If we end up with too many slow queries, just update the
+    // DFS numbers on the theory that we are going to keep querying.
+    SlowQueries++;
+    if (SlowQueries > 32) {
+      updateDFSNumbers();
+      return B->DominatedBy(A);
+    }
+
     const DomTreeNodeBase<NodeT> *IDom;
 
     // Don't walk nodes above A's subtree. When we reach A's level, we must

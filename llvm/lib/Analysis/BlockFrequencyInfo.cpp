@@ -142,8 +142,9 @@ struct DOTGraphTraits<BlockFrequencyInfo *> : public BFIDOTGTraitsBase {
 
   std::string getEdgeAttributes(const BasicBlock *Node, EdgeIter EI,
                                 const BlockFrequencyInfo *BFI) {
-    return BFIDOTGTraitsBase::getEdgeAttributes(Node, EI, BFI, BFI->getBPI(),
-                                                ViewHotFreqPercent);
+    unsigned EdgeIndex = std::distance(succ_begin(Node), EI);
+    return BFIDOTGTraitsBase::getEdgeAttributes(
+        Node, EdgeIndex, BFI, BFI->getBPI(), ViewHotFreqPercent);
   }
 };
 

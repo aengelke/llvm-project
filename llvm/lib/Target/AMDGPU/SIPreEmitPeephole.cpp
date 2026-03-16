@@ -418,7 +418,8 @@ public:
     const auto *FromIt = find(Head.successors(), &Succ);
     assert(FromIt != Head.succ_end());
 
-    BranchProb = Head.getSuccProbability(FromIt);
+    BranchProb =
+        Head.getSuccProbability(std::distance(Head.succ_begin(), FromIt));
     if (BranchProb.isUnknown())
       BranchProb = BranchProbability::getZero();
     BranchTakenCost = SchedModel.computeInstrLatency(&Branch);

@@ -1291,7 +1291,7 @@ public:
   /// Return probability of the edge from this block to MBB. This method should
   /// NOT be called directly, but by using getEdgeProbability method from
   /// MachineBranchProbabilityInfo class.
-  LLVM_ABI BranchProbability getSuccProbability(const_succ_iterator Succ) const;
+  LLVM_ABI BranchProbability getSuccProbability(unsigned SuccIdx) const;
 
   // Helper function for MIRPrinter.
   LLVM_ABI bool canPredictBranchProbabilities() const;

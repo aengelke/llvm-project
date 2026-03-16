@@ -393,20 +393,20 @@ void MachineBasicBlock::print(raw_ostream &OS, ModuleSlotTracker &MST,
     // Print the successors
     OS.indent(2) << "successors: ";
     ListSeparator LS;
-    for (auto I = succ_begin(), E = succ_end(); I != E; ++I) {
-      OS << LS << printMBBReference(**I);
-      if (!Probs.empty())
-        OS << '('
-           << format("0x%08" PRIx32, getSuccProbability(I).getNumerator())
-           << ')';
+    for (auto It : enumerate(successors())) {
+      OS << LS << printMBBReference(*It.value());
+      if (!Probs.empty()) {
+        BranchProbability BP = getSuccProbability(It.index());
+        OS << '(' << format("0x%08" PRIx32, BP.getNumerator()) << ')';
+      }
     }
     if (!Probs.empty() && IsStandalone) {
       // Print human readable probabilities as comments.
       OS << "; ";
       ListSeparator LS;
-      for (auto I = succ_begin(), E = succ_end(); I != E; ++I) {
-        const BranchProbability &BP = getSuccProbability(I);
-        OS << LS << printMBBReference(**I) << '('
+      for (auto It : enumerate(successors())) {
+        BranchProbability BP = getSuccProbability(It.index());
+        OS << LS << printMBBReference(*It.value()) << '('
            << format("%.2f%%",
                      rint(((double)BP.getNumerator() / BP.getDenominator()) *
                           100.0 * 100.0) /
@@ -924,7 +924,7 @@ void MachineBasicBlock::replaceSuccessor(MachineBasicBlock *Old,
 void MachineBasicBlock::copySuccessor(const MachineBasicBlock *Orig,
                                       succ_iterator I) {
   if (!Orig->Probs.empty())
-    addSuccessor(*I, Orig->getSuccProbability(I));
+    addSuccessor(*I, *Orig->getProbabilityIterator(I));
   else
     addSuccessorWithoutProb(*I);
 }
@@ -1616,12 +1616,10 @@ MachineBasicBlock::findBranchDebugLoc() {
 
 /// Return probability of the edge from this block to MBB.
 BranchProbability
-MachineBasicBlock::getSuccProbability(const_succ_iterator Succ) const {
+MachineBasicBlock::getSuccProbability(unsigned SuccIdx) const {
   if (Probs.empty())
     return BranchProbability(1, succ_size());
-
-  const auto &Prob = *getProbabilityIterator(Succ);
-  if (!Prob.isUnknown())
+  if (BranchProbability Prob = Probs[SuccIdx]; !Prob.isUnknown())
     return Prob;
   // For unknown probabilities, collect the sum of all known ones, and evenly
   // ditribute the complemental of the sum to each unknown probability.

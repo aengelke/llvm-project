@@ -770,11 +770,11 @@ void printMBB(raw_ostream &OS, MFPrintState &State,
     if (!MBB.succ_empty())
       OS << " ";
     ListSeparator LS;
-    for (auto I = MBB.succ_begin(), E = MBB.succ_end(); I != E; ++I) {
-      OS << LS << printMBBReference(**I);
+    for (auto It : enumerate(MBB.successors())) {
+      OS << LS << printMBBReference(*It.value());
       if (!SimplifyMIR || !canPredictProbs)
         OS << format("(0x%08" PRIx32 ")",
-                     MBB.getSuccProbability(I).getNumerator());
+                     MBB.getSuccProbability(It.index()).getNumerator());
     }
     OS << "\n";
     HasLineAttributes = true;

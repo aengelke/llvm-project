@@ -152,8 +152,9 @@ struct llvm::DOTGraphTraits<MachineBlockFrequencyInfo *>
 
   std::string getEdgeAttributes(const MachineBasicBlock *Node, EdgeIter EI,
                                 const MachineBlockFrequencyInfo *MBFI) {
+    unsigned EdgeIndex = std::distance(Node->succ_begin(), EI);
     return MBFIDOTGraphTraitsBase::getEdgeAttributes(
-        Node, EI, MBFI, MBFI->getMBPI(), ViewHotFreqPercent);
+        Node, EdgeIndex, MBFI, MBFI->getMBPI(), ViewHotFreqPercent);
   }
 };
 

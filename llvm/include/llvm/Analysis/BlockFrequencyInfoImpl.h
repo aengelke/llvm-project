@@ -1672,14 +1672,13 @@ BlockFrequencyInfoImpl<BT>::propagateMassToSuccessors(LoopData *OuterLoop,
       return false;
   } else {
     const BlockT *BB = getBlock(Node);
-    for (auto SI = GraphTraits<const BlockT *>::child_begin(BB),
-              SE = GraphTraits<const BlockT *>::child_end(BB);
-         SI != SE; ++SI)
-      if (!addToDist(
-              Dist, OuterLoop, Node, getNode(*SI),
-              getWeightFromBranchProb(BPI->getEdgeProbability(BB, SI))))
+    for (auto It : enumerate(children<const BlockT *>(BB))) {
+      BranchProbability Prob = BPI->getEdgeProbability(BB, It.index());
+      if (!addToDist(Dist, OuterLoop, Node, getNode(It.value()),
+                     Prob.getNumerator()))
         // Irreducible backedge.
         return false;
+    }
   }
 
   // Distribute mass to successors, saving exit and backedge data in the
@@ -1847,7 +1846,7 @@ struct BFIDOTGraphTraitsBase : public DefaultDOTGraphTraits {
     return Result;
   }
 
-  std::string getEdgeAttributes(NodeRef Node, EdgeIter EI,
+  std::string getEdgeAttributes(NodeRef Node, unsigned EdgeIndex,
                                 const BlockFrequencyInfoT *BFI,
                                 const BranchProbabilityInfoT *BPI,
                                 unsigned HotPercentThreshold = 0) {
@@ -1855,7 +1854,7 @@ struct BFIDOTGraphTraitsBase : public DefaultDOTGraphTraits {
     if (!BPI)
       return Str;
 
-    BranchProbability BP = BPI->getEdgeProbability(Node, EI);
+    BranchProbability BP = BPI->getEdgeProbability(Node, EdgeIndex);
     uint32_t N = BP.getNumerator();
     uint32_t D = BP.getDenominator();
     double Percent = 100.0 * N / D;

@@ -37,11 +37,11 @@ public:
   BranchProbability getEdgeProbability(const MachineBasicBlock *Src,
                                        const MachineBasicBlock *Dst) const;
 
-  // Same as above, but using a const_succ_iterator from Src. This is faster
-  // when the iterator is already available.
-  BranchProbability
-  getEdgeProbability(const MachineBasicBlock *Src,
-                     MachineBasicBlock::const_succ_iterator Dst) const;
+  // Same as above, but using the successor index. This is faster.
+  BranchProbability getEdgeProbability(const MachineBasicBlock *Src,
+                                       unsigned SuccIdx) const {
+    return Src->getSuccProbability(SuccIdx);
+  }
 
   // A 'Hot' edge is an edge which probability is >= 80%.
   bool isEdgeHot(const MachineBasicBlock *Src,

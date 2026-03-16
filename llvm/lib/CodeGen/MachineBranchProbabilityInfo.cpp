@@ -72,16 +72,12 @@ bool MachineBranchProbabilityInfo::invalidate(
 }
 
 BranchProbability MachineBranchProbabilityInfo::getEdgeProbability(
-    const MachineBasicBlock *Src,
-    MachineBasicBlock::const_succ_iterator Dst) const {
-  return Src->getSuccProbability(Dst);
-}
-
-BranchProbability MachineBranchProbabilityInfo::getEdgeProbability(
     const MachineBasicBlock *Src, const MachineBasicBlock *Dst) const {
-  // This is a linear search. Try to use the const_succ_iterator version when
-  // possible.
-  return getEdgeProbability(Src, find(Src->successors(), Dst));
+  // This is a linear search.
+  for (auto It : enumerate(Src->successors()))
+    if (It.value() == Dst)
+      return getEdgeProbability(Src, It.index());
+  llvm_unreachable("Dst not a successor of Src");
 }
 
 bool MachineBranchProbabilityInfo::isEdgeHot(

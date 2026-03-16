@@ -248,7 +248,9 @@ void MIRProfileLoader::setBranchProbs(MachineFunction &F) {
       assert(BBWeight >= EdgeWeight &&
              "BBweight is larger than EdgeWeight -- should not happen.\n");
 
-      BranchProbability OldProb = BFI->getMBPI()->getEdgeProbability(BB, SI);
+      unsigned SuccIdx = std::distance(BB->succ_begin(), SI);
+      BranchProbability OldProb =
+          BFI->getMBPI()->getEdgeProbability(BB, SuccIdx);
       BranchProbability NewProb(EdgeWeight, BBWeight);
       if (OldProb == NewProb)
         continue;

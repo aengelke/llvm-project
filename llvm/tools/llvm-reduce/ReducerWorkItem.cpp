@@ -340,11 +340,9 @@ static std::unique_ptr<MachineFunction> cloneMF(MachineFunction *SrcMF,
     auto *DstMBB = Src2DstMBB[&SrcMBB];
     DstMF->push_back(DstMBB);
 
-    for (auto It = SrcMBB.succ_begin(), IterEnd = SrcMBB.succ_end();
-         It != IterEnd; ++It) {
-      auto *SrcSuccMBB = *It;
-      auto *DstSuccMBB = Src2DstMBB[SrcSuccMBB];
-      DstMBB->addSuccessor(DstSuccMBB, SrcMBB.getSuccProbability(It));
+    for (auto It : enumerate(SrcMBB.successors())) {
+      auto *DstSuccMBB = Src2DstMBB[It.value()];
+      DstMBB->addSuccessor(DstSuccMBB, SrcMBB.getSuccProbability(It.index()));
     }
 
     for (auto &LI : SrcMBB.liveins_dbg())

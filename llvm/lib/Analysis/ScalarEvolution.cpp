@@ -11914,7 +11914,7 @@ bool ScalarEvolution::isBasicBlockEntryGuardedByCond(const BasicBlock *BB,
   bool ProvedNonStrictComparison = false;
   bool ProvedNonEquality = false;
 
-  auto SplitAndProve = [&](std::function<bool(CmpPredicate)> Fn) -> bool {
+  auto SplitAndProve = [&](auto Fn) -> bool {
     if (!ProvedNonStrictComparison)
       ProvedNonStrictComparison = Fn(NonStrictPredicate);
     if (!ProvedNonEquality)

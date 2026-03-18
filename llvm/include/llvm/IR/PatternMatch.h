@@ -621,19 +621,31 @@ inline cst_pred_ty<is_one> m_One() { return cst_pred_ty<is_one>(); }
 struct is_zero_int {
   bool isValue(const APInt &C) const { return C.isZero(); }
 };
+struct is_zero_int2 {
+  template <typename ITy> bool match(ITy *V) const {
+    if (auto *C = dyn_cast<ConstantInt>(V))
+      return C->isNullValue();
+    return isa<VectorType>(V->getType()) && cst_pred_ty<is_zero_int>().match(V);
+  }
+};
 /// Match an integer 0 or a vector with all elements equal to 0.
 /// For vectors, this includes constants with undefined elements.
-inline cst_pred_ty<is_zero_int> m_ZeroInt() {
-  return cst_pred_ty<is_zero_int>();
+inline is_zero_int2 m_ZeroInt() {
+  return is_zero_int2();
 }
 
-struct is_non_zero_int {
-  bool isValue(const APInt &C) const { return !C.isZero(); }
+struct is_non_zero {
+  template <typename ITy> bool match(ITy *V) const {
+    if (auto *C = dyn_cast<ConstantInt>(V))
+      return !C->isNullValue();
+    return !isa<VectorType>(V->getType()) || !cst_pred_ty<is_zero_int>().match(V);
+  }
 };
+
 /// Match a non-zero integer or a vector with all non-zero elements.
 /// For vectors, this includes constants with undefined elements.
-inline cst_pred_ty<is_non_zero_int> m_NonZeroInt() {
-  return cst_pred_ty<is_non_zero_int>();
+inline is_non_zero m_NonZeroInt() {
+  return is_non_zero();
 }
 
 struct is_zero {
@@ -3124,14 +3136,14 @@ inline BinaryOp_match<LHS, RHS, Instruction::Xor, true> m_c_Xor(const LHS &L,
 
 /// Matches a 'Neg' as 'sub 0, V'.
 template <typename ValTy>
-inline BinaryOp_match<cst_pred_ty<is_zero_int>, ValTy, Instruction::Sub>
+inline BinaryOp_match<is_zero_int2, ValTy, Instruction::Sub>
 m_Neg(const ValTy &V) {
   return m_Sub(m_ZeroInt(), V);
 }
 
 /// Matches a 'Neg' as 'sub nsw 0, V'.
 template <typename ValTy>
-inline OverflowingBinaryOp_match<cst_pred_ty<is_zero_int>, ValTy,
+inline OverflowingBinaryOp_match<is_zero_int2, ValTy,
                                  Instruction::Sub,
                                  OverflowingBinaryOperator::NoSignedWrap>
 m_NSWNeg(const ValTy &V) {

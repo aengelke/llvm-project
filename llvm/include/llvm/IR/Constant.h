@@ -40,6 +40,9 @@ class APInt;
 /// Constants are created on demand as needed and never deleted: thus clients
 /// don't have to worry about the lifetime of the objects.
 /// LLVM Constant Representation
+///
+/// The class uses SubclassData to quickly identify typical constant values;
+/// additionally, ConstantExpr uses SubclassData for the expression opcode.
 class Constant : public User {
 protected:
   Constant(Type *ty, ValueTy vty, AllocInfo AllocInfo)
@@ -52,7 +55,9 @@ public:
   Constant(const Constant &) = delete;
 
   /// Return true if this is the value that would be returned by getNullValue.
-  LLVM_ABI bool isNullValue() const;
+  LLVM_ABI bool isNullValue() const {
+    return getSubclassDataFromValue() == IsZeroValue;
+  }
 
   /// Returns true if the value is one.
   LLVM_ABI bool isOneValue() const;
@@ -259,6 +264,26 @@ private:
   PossibleRelocationsTy getRelocationInfo() const;
 
   bool hasNLiveUses(unsigned N) const;
+
+private:
+  // Shadow Value::setValueSubclassData with a private forwarding method so that
+  // subclasses cannot accidentally use it.
+  void setValueSubclassData(unsigned short D) {
+    Value::setValueSubclassData(D);
+  }
+
+protected:
+  /// Data stored in Value::SubclassData.
+  enum SubclassData : uint16_t {
+    // 0 is for used for all other constants.
+    IsZeroValue = 1, ///< Indicates that this is a zero constant.
+    ExprOpcodeBegin, ///< Larger values are used for the ConstantExpr opcode.
+  };
+
+  // For ConstantExpr.
+  void setConstantSubclassData(SubclassData D) {
+    setValueSubclassData(D);
+  }
 };
 
 } // end namespace llvm

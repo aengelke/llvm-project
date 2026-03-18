@@ -503,7 +503,9 @@ class ConstantAggregateZero final : public ConstantData {
   friend class Constant;
 
   explicit ConstantAggregateZero(Type *Ty)
-      : ConstantData(Ty, ConstantAggregateZeroVal) {}
+      : ConstantData(Ty, ConstantAggregateZeroVal) {
+    setConstantSubclassData(IsZeroValue);
+  }
 
   void destroyConstantImpl();
 
@@ -702,7 +704,9 @@ class ConstantPointerNull final : public ConstantData {
   friend class Constant;
 
   explicit ConstantPointerNull(PointerType *T)
-      : ConstantData(T, Value::ConstantPointerNullVal) {}
+      : ConstantData(T, Value::ConstantPointerNullVal) {
+    setConstantSubclassData(IsZeroValue);
+  }
 
   void destroyConstantImpl();
 
@@ -1017,7 +1021,9 @@ class ConstantTokenNone final : public ConstantData {
   friend class Constant;
 
   explicit ConstantTokenNone(LLVMContext &Context)
-      : ConstantData(Type::getTokenTy(Context), ConstantTokenNoneVal) {}
+      : ConstantData(Type::getTokenTy(Context), ConstantTokenNoneVal) {
+    setConstantSubclassData(IsZeroValue);
+  }
 
   void destroyConstantImpl();
 
@@ -1038,7 +1044,9 @@ class ConstantTargetNone final : public ConstantData {
   friend class Constant;
 
   explicit ConstantTargetNone(TargetExtType *T)
-      : ConstantData(T, Value::ConstantTargetNoneVal) {}
+      : ConstantData(T, Value::ConstantTargetNoneVal) {
+    setConstantSubclassData(IsZeroValue);
+  }
 
   void destroyConstantImpl();
 
@@ -1299,7 +1307,8 @@ protected:
   ConstantExpr(Type *ty, unsigned Opcode, AllocInfo AllocInfo)
       : Constant(ty, ConstantExprVal, AllocInfo) {
     // Operation type (an Instruction opcode) is stored as the SubclassData.
-    setValueSubclassData(Opcode);
+    assert(Opcode >= ExprOpcodeBegin && "opcode too small");
+    setConstantSubclassData(static_cast<SubclassData>(Opcode));
   }
 
   ~ConstantExpr() = default;
@@ -1580,11 +1589,9 @@ public:
   }
 
 private:
-  // Shadow Value::setValueSubclassData with a private forwarding method so that
-  // subclasses cannot accidentally use it.
-  void setValueSubclassData(unsigned short D) {
-    Value::setValueSubclassData(D);
-  }
+  // Shadow Constant::setConstantSubclassData with a private forwarding method
+  // so that subclasses cannot accidentally use it.
+  using Constant::setConstantSubclassData;
 };
 
 template <>

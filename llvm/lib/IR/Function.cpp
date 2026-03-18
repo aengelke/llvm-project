@@ -495,6 +495,8 @@ Function::Function(FunctionType *Ty, LinkageTypes Linkage, unsigned AddrSpace,
   // If the function has arguments, mark them as lazily built.
   if (Ty->getNumParams())
     setValueSubclassData(1);   // Set the "has lazy arguments" bit.
+  // Set reserved bit to avoid collision with Constant.
+  setValueSubclassDataBit(15, true); 
 
   if (ParentModule) {
     ParentModule->getFunctionList().push_back(this);

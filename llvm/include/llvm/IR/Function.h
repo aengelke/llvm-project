@@ -94,6 +94,7 @@ private:
 
   /*
    * Value::SubclassData
+   * Note: Function inherits from Constant, which itself reserved value 1.
    *
    * bit 0      : HasLazyArguments
    * bit 1      : HasPrefixData
@@ -101,7 +102,7 @@ private:
    * bit 3      : HasPersonalityFn
    * bits 4-13  : CallingConvention
    * bits 14    : HasGC
-   * bits 15 : [reserved]
+   * bits 15 : [reserved, must be 1]
    */
 
   /// Bits from GlobalObject::GlobalObjectSubclassData.

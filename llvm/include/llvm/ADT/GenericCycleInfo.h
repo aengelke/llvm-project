@@ -65,7 +65,8 @@ private:
   SmallVector<BlockT *, 1> Entries;
 
   /// Child cycles, if any.
-  std::vector<GenericCycle *> Children;
+  GenericCycle *FirstChild = nullptr;
+  GenericCycle *Sibling = nullptr;
 
   /// Basic blocks that are contained in the cycle, including entry blocks,
   /// and including blocks that are part of a child cycle.
@@ -85,7 +86,8 @@ private:
 
   void clear() {
     Entries.clear();
-    Children.clear();
+    FirstChild = nullptr;
+    Sibling = nullptr;
     Blocks.clear();
     Depth = 0;
     ParentCycle = nullptr;
@@ -175,10 +177,8 @@ public:
   const_child_iterator child_end() const {
     return const_child_iterator{Children.end()};
   }
-  size_t getNumChildren() const { return Children.size(); }
   iterator_range<const_child_iterator> children() const {
-    return llvm::make_range(const_child_iterator{Children.begin()},
-                            const_child_iterator{Children.end()});
+    return llvm::make_range(child_begin(), child_end());
   }
   //@}
 

@@ -16,7 +16,6 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/Analysis/CycleAnalysis.h"
 #include "llvm/Analysis/IVDescriptors.h"
 #include "llvm/Analysis/LoopIterator.h"
 #include "llvm/Analysis/LoopNestAnalysis.h"
@@ -989,8 +988,6 @@ bool LoopInfo::wouldBeOutOfLoopUseRequiringLCSSA(
 AnalysisKey LoopAnalysis::Key;
 
 LoopInfo LoopAnalysis::run(Function &F, FunctionAnalysisManager &AM) {
-  // Compute a bonus cycle info.
-  AM.getResult<CycleAnalysis>(F);
   // FIXME: Currently we create a LoopInfo from scratch for every function.
   // This may prove to be too wasteful due to deallocating and re-allocating
   // memory each time for the underlying map and vector datastructures. At some

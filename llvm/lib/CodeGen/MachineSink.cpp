@@ -779,7 +779,6 @@ MachineSinkingPass::run(MachineFunction &MF,
   if (!Changed)
     return PreservedAnalyses::all();
   auto PA = getMachineFunctionPassPreservedAnalyses();
-  PA.preserve<MachineCycleAnalysis>();
   PA.preserve<MachineLoopAnalysis>();
   if (UseBlockFreqInfo)
     PA.preserve<MachineBlockFrequencyAnalysis>();
@@ -865,7 +864,6 @@ bool MachineSinking::run(MachineFunction &MF) {
 
         MadeChange = true;
         ++NumSplit;
-        CI->splitCriticalEdge(Pair.first, Pair.second, NewSucc);
       } else
         LLVM_DEBUG(dbgs() << " *** Not legal to break critical edge\n");
     }

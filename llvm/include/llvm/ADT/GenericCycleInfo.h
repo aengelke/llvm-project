@@ -128,14 +128,6 @@ public:
     return is_contained(Entries, Block);
   }
 
-  /// \brief Replace all entries with \p Block as single entry.
-  void setSingleEntry(BlockT *Block) {
-    assert(contains(Block));
-    Entries.clear();
-    Entries.push_back(Block);
-    clearCache();
-  }
-
   /// \brief Return whether \p Block is contained in the cycle.
   bool contains(const BlockT *Block) const { return Blocks.contains(Block); }
 
@@ -289,7 +281,6 @@ public:
 
   void clear();
   void compute(FunctionT &F);
-  void splitCriticalEdge(BlockT *Pred, BlockT *Succ, BlockT *New);
 
   const FunctionT *getFunction() const { return Context.getFunction(); }
   const ContextT &getSSAContext() const { return Context; }
@@ -299,12 +290,6 @@ public:
   CycleT *getSmallestCommonCycle(BlockT *A, BlockT *B) const;
   unsigned getCycleDepth(const BlockT *Block) const;
   CycleT *getTopLevelParentCycle(BlockT *Block);
-
-  /// Assumes that \p Cycle is the innermost cycle containing \p Block.
-  /// \p Block will be appended to \p Cycle and all of its parent cycles.
-  /// \p Block will be added to BlockMap with \p Cycle and
-  /// BlockMapTopLevel with \p Cycle's top level parent cycle.
-  void addBlockToCycle(BlockT *Block, CycleT *Cycle);
 
   /// Methods for debug and self-test.
   //@{

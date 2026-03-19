@@ -313,24 +313,6 @@ void GenericCycleInfo<ContextT>::moveTopLevelCycleToNewParent(CycleT *NewParent,
   Child->clearCache();
 }
 
-template <typename ContextT>
-void GenericCycleInfo<ContextT>::addBlockToCycle(BlockT *Block, CycleT *Cycle) {
-  // FixMe: Appending NewBlock is fine as a set of blocks in a cycle. When
-  // printing, cycle NewBlock is at the end of list but it should be in the
-  // middle to represent actual traversal of a cycle.
-  Cycle->appendBlock(Block);
-  BlockMap.try_emplace(Block, Cycle);
-
-  CycleT *ParentCycle = Cycle->getParentCycle();
-  while (ParentCycle) {
-    Cycle = ParentCycle;
-    Cycle->appendBlock(Block);
-    ParentCycle = Cycle->getParentCycle();
-  }
-
-  Cycle->clearCache();
-}
-
 /// \brief Main function of the cycle info computations.
 template <typename ContextT>
 void GenericCycleInfoCompute<ContextT>::run(FunctionT *F) {
@@ -512,19 +494,6 @@ void GenericCycleInfo<ContextT>::compute(FunctionT &F) {
   LLVM_DEBUG(errs() << "Computing cycles for function: " << F.getName()
                     << "\n");
   Compute.run(&F);
-}
-
-template <typename ContextT>
-void GenericCycleInfo<ContextT>::splitCriticalEdge(BlockT *Pred, BlockT *Succ,
-                                                   BlockT *NewBlock) {
-  // Edge Pred-Succ is replaced by edges Pred-NewBlock and NewBlock-Succ, all
-  // cycles that had blocks Pred and Succ also get NewBlock.
-  CycleT *Cycle = getSmallestCommonCycle(getCycle(Pred), getCycle(Succ));
-  if (!Cycle)
-    return;
-
-  addBlockToCycle(NewBlock, Cycle);
-  verifyCycleNest();
 }
 
 /// \brief Find the innermost cycle containing a given block.

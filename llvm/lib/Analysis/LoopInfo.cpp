@@ -988,6 +988,8 @@ bool LoopInfo::wouldBeOutOfLoopUseRequiringLCSSA(
 AnalysisKey LoopAnalysis::Key;
 
 LoopInfo LoopAnalysis::run(Function &F, FunctionAnalysisManager &AM) {
+  LoopInfo LI2;
+  LI2.analyze(AM.getResult<DominatorTreeAnalysis>(F));
   // FIXME: Currently we create a LoopInfo from scratch for every function.
   // This may prove to be too wasteful due to deallocating and re-allocating
   // memory each time for the underlying map and vector datastructures. At some

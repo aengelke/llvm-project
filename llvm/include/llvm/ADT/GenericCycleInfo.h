@@ -33,6 +33,7 @@
 #include "llvm/ADT/GraphTraits.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Allocator.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -64,7 +65,7 @@ private:
   SmallVector<BlockT *, 1> Entries;
 
   /// Child cycles, if any.
-  std::vector<std::unique_ptr<GenericCycle>> Children;
+  std::vector<GenericCycle *> Children;
 
   /// Basic blocks that are contained in the cycle, including entry blocks,
   /// and including blocks that are part of a child cycle.
@@ -166,20 +167,8 @@ public:
 
   /// Iteration over child cycles.
   //@{
-  using const_child_iterator_base =
-      typename std::vector<std::unique_ptr<GenericCycle>>::const_iterator;
-  struct const_child_iterator
-      : iterator_adaptor_base<const_child_iterator, const_child_iterator_base> {
-    using Base =
-        iterator_adaptor_base<const_child_iterator, const_child_iterator_base>;
-
-    const_child_iterator() = default;
-    explicit const_child_iterator(const_child_iterator_base I) : Base(I) {}
-
-    const const_child_iterator_base &wrapped() { return Base::wrapped(); }
-    GenericCycle *operator*() const { return Base::I->get(); }
-  };
-
+  using const_child_iterator =
+      typename std::vector<GenericCycle *>::const_iterator;
   const_child_iterator child_begin() const {
     return const_child_iterator{Children.begin()};
   }
@@ -266,7 +255,9 @@ private:
   ///
   /// Note: The implementation treats the nullptr as the parent of
   /// every top-level cycle. See \ref contains for an example.
-  std::vector<std::unique_ptr<CycleT>> TopLevelCycles;
+  std::vector<CycleT *> TopLevelCycles;
+
+  SpecificBumpPtrAllocator<CycleT> CycleAllocator;
 
   /// Move \p Child to \p NewParent by manipulating Children vectors.
   ///
@@ -302,22 +293,8 @@ public:
 
   /// Iteration over top-level cycles.
   //@{
-  using const_toplevel_iterator_base =
-      typename std::vector<std::unique_ptr<CycleT>>::const_iterator;
-  struct const_toplevel_iterator
-      : iterator_adaptor_base<const_toplevel_iterator,
-                              const_toplevel_iterator_base> {
-    using Base = iterator_adaptor_base<const_toplevel_iterator,
-                                       const_toplevel_iterator_base>;
-
-    const_toplevel_iterator() = default;
-    explicit const_toplevel_iterator(const_toplevel_iterator_base I)
-        : Base(I) {}
-
-    const const_toplevel_iterator_base &wrapped() { return Base::wrapped(); }
-    CycleT *operator*() const { return Base::I->get(); }
-  };
-
+  using const_toplevel_iterator =
+      typename std::vector<CycleT *>::const_iterator;
   const_toplevel_iterator toplevel_begin() const {
     return const_toplevel_iterator{TopLevelCycles.begin()};
   }

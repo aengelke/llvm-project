@@ -296,9 +296,8 @@ void GenericCycleInfo<ContextT>::moveTopLevelCycleToNewParent(CycleT *NewParent,
          "NewParent and Child must be both top level cycle!\n");
   auto &CurrentContainer =
       Child->ParentCycle ? Child->ParentCycle->Children : TopLevelCycles;
-  auto Pos = llvm::find_if(CurrentContainer, [=](const auto &Ptr) -> bool {
-    return Child == Ptr.get();
-  });
+  auto Pos = llvm::find_if(
+      CurrentContainer, [=](const auto &Ptr) -> bool { return Child == Ptr; });
   assert(Pos != CurrentContainer.end());
   NewParent->Children.push_back(std::move(*Pos));
   *Pos = std::move(CurrentContainer.back());
@@ -340,10 +339,10 @@ void GenericCycleInfoCompute<ContextT>::run(FunctionT *F) {
     // Found a cycle with the candidate as its header.
     LLVM_DEBUG(errs() << "Found cycle for header: "
                       << Info.Context.print(HeaderCandidate) << "\n");
-    std::unique_ptr<CycleT> NewCycle = std::make_unique<CycleT>();
+    CycleT *NewCycle = new (Info.CycleAllocator.Allocate()) CycleT();
     NewCycle->appendEntry(HeaderCandidate);
     NewCycle->appendBlock(HeaderCandidate);
-    Info.BlockMap.try_emplace(HeaderCandidate, NewCycle.get());
+    Info.BlockMap.try_emplace(HeaderCandidate, NewCycle);
 
     // Helper function to process (non-back-edge) predecessors of a discovered
     // block and either add them to the worklist or recognize that the given
@@ -384,12 +383,12 @@ void GenericCycleInfoCompute<ContextT>::run(FunctionT *F) {
       if (auto *BlockParent = Info.getTopLevelParentCycle(Block)) {
         LLVM_DEBUG(errs() << "  block " << Info.Context.print(Block) << ": ");
 
-        if (BlockParent != NewCycle.get()) {
+        if (BlockParent != NewCycle) {
           LLVM_DEBUG(errs()
                      << "discovered child cycle "
                      << Info.Context.print(BlockParent->getHeader()) << "\n");
           // Make BlockParent the child of NewCycle.
-          Info.moveTopLevelCycleToNewParent(NewCycle.get(), BlockParent);
+          Info.moveTopLevelCycleToNewParent(NewCycle, BlockParent);
 
           for (auto *ChildEntry : BlockParent->entries())
             ProcessPredecessors(ChildEntry);
@@ -399,7 +398,7 @@ void GenericCycleInfoCompute<ContextT>::run(FunctionT *F) {
                      << Info.Context.print(BlockParent->getHeader()) << "\n");
         }
       } else {
-        Info.BlockMap.try_emplace(Block, NewCycle.get());
+        Info.BlockMap.try_emplace(Block, NewCycle);
         assert(!is_contained(NewCycle->Blocks, Block));
         NewCycle->Blocks.insert(Block);
         ProcessPredecessors(Block);

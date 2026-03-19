@@ -281,7 +281,6 @@ LLVM_ABI BasicBlock *SplitEdge(BasicBlock *From, BasicBlock *To,
 ///                       instruction
 /// \param DTU            optional \p DomTreeUpdater for updating the
 ///                       dominator tree
-/// \param CI             optional \p CycleInfo for updating cycle membership
 /// \param LI             optional \p LoopInfo for updating loop membership
 /// \param UpdatedLI      optional output flag indicating if \p LoopInfo has
 ///                       been updated
@@ -290,10 +289,11 @@ LLVM_ABI BasicBlock *SplitEdge(BasicBlock *From, BasicBlock *To,
 ///
 /// \note This function updates PHI nodes, dominator tree, loop info, and
 /// cycle info as needed.
-LLVM_ABI BasicBlock *
-SplitCallBrEdge(BasicBlock *CallBrBlock, BasicBlock *Succ, unsigned SuccIdx,
-                DomTreeUpdater *DTU = nullptr, CycleInfo *CI = nullptr,
-                LoopInfo *LI = nullptr, bool *UpdatedLI = nullptr);
+LLVM_ABI BasicBlock *SplitCallBrEdge(BasicBlock *CallBrBlock, BasicBlock *Succ,
+                                     unsigned SuccIdx,
+                                     DomTreeUpdater *DTU = nullptr,
+                                     LoopInfo *LI = nullptr,
+                                     bool *UpdatedLI = nullptr);
 
 /// Sets the unwind edge of an instruction to a particular successor.
 LLVM_ABI void setUnwindEdgeTo(Instruction *TI, BasicBlock *Succ);

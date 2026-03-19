@@ -693,42 +693,9 @@ BasicBlock *llvm::SplitEdge(BasicBlock *BB, BasicBlock *Succ, DominatorTree *DT,
   return SplitBlock(BB, BB->getTerminator(), DT, LI, MSSAU, BBName);
 }
 
-/// Helper function to update the cycle or loop information after inserting a
-/// new block between a callbr instruction and one of its target blocks.  Adds
-/// the new block to the innermost cycle or loop that the callbr instruction and
-/// the original target block share.
-/// \p LCI            cycle or loop information to update
-/// \p CallBrBlock    block containing the callbr instruction
-/// \p CallBrTarget   new target block of the callbr instruction
-/// \p Succ           original target block of the callbr instruction
-template <typename TI, typename T>
-static bool updateCycleLoopInfo(TI *LCI, BasicBlock *CallBrBlock,
-                                BasicBlock *CallBrTarget, BasicBlock *Succ) {
-  static_assert(std::is_same_v<TI, CycleInfo> || std::is_same_v<TI, LoopInfo>,
-                "type must be CycleInfo or LoopInfo");
-  if (!LCI)
-    return false;
-
-  T *LC;
-  if constexpr (std::is_same_v<TI, CycleInfo>)
-    LC = LCI->getSmallestCommonCycle(CallBrBlock, Succ);
-  else
-    LC = LCI->getSmallestCommonLoop(CallBrBlock, Succ);
-  if (!LC)
-    return false;
-
-  if constexpr (std::is_same_v<TI, CycleInfo>)
-    LCI->addBlockToCycle(CallBrTarget, LC);
-  else
-    LC->addBasicBlockToLoop(CallBrTarget, *LCI);
-
-  return true;
-}
-
 BasicBlock *llvm::SplitCallBrEdge(BasicBlock *CallBrBlock, BasicBlock *Succ,
                                   unsigned SuccIdx, DomTreeUpdater *DTU,
-                                  CycleInfo *CI, LoopInfo *LI,
-                                  bool *UpdatedLI) {
+                                  LoopInfo *LI, bool *UpdatedLI) {
   CallBrInst *CallBr = dyn_cast<CallBrInst>(CallBrBlock->getTerminator());
   assert(CallBr && "expected callbr terminator");
   assert(SuccIdx < CallBr->getNumSuccessors() &&
@@ -751,11 +718,13 @@ BasicBlock *llvm::SplitCallBrEdge(BasicBlock *CallBrBlock, BasicBlock *Succ,
   // Jump from the new target block to the original successor.
   UncondBrInst::Create(Succ, CallBrTarget);
 
-  bool Updated =
-      updateCycleLoopInfo<LoopInfo, Loop>(LI, CallBrBlock, CallBrTarget, Succ);
-  if (UpdatedLI)
-    *UpdatedLI = Updated;
-  updateCycleLoopInfo<CycleInfo, Cycle>(CI, CallBrBlock, CallBrTarget, Succ);
+  if (LI) {
+    if (Loop *L = LI->getSmallestCommonLoop(CallBrBlock, Succ)) {
+      L->addBasicBlockToLoop(CallBrTarget, *LI);
+      if (UpdatedLI)
+        *UpdatedLI = true;
+    }
+  }
   if (DTU) {
     DTU->applyUpdates({{DominatorTree::Insert, CallBrBlock, CallBrTarget}});
     if (DTU->getDomTree().dominates(CallBrBlock, Succ)) {

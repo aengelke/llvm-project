@@ -193,7 +193,7 @@ static bool unifyLoopExits(DominatorTree &DT, LoopInfo &LI, Loop *L) {
           continue;
         bool UpdatedLI = false;
         BasicBlock *NewSucc =
-            SplitCallBrEdge(BB, Succ, J, &DTU, nullptr, &LI, &UpdatedLI);
+            SplitCallBrEdge(BB, Succ, J, &DTU, &LI, &UpdatedLI);
         // SplitCallBrEdge modifies the CFG because it creates an intermediate
         // block. So we need to set the changed flag no matter what the
         // ControlFlowHub is going to do later.

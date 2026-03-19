@@ -153,7 +153,6 @@ struct FixIrreducible : public FunctionPass {
     AU.addRequired<DominatorTreeWrapperPass>();
     AU.addRequired<CycleInfoWrapperPass>();
     AU.addPreserved<DominatorTreeWrapperPass>();
-    AU.addPreserved<CycleInfoWrapperPass>();
     AU.addPreserved<LoopInfoWrapperPass>();
   }
 
@@ -219,7 +218,8 @@ static void reconnectChildLoops(LoopInfo &LI, Loop *ParentLoop, Loop *NewLoop,
 }
 
 static void updateLoopInfo(LoopInfo &LI, Cycle &C,
-                           ArrayRef<BasicBlock *> GuardBlocks) {
+                           ArrayRef<BasicBlock *> GuardBlocks,
+                           const SmallPtrSetImpl<BasicBlock *> &CallBrPreds) {
   // The parent loop is a natural loop L mapped to the cycle header H as long as
   // H is not also the header of L. In the latter case, L is destroyed and we
   // seek its parent instead.
@@ -256,6 +256,16 @@ static void updateLoopInfo(LoopInfo &LI, Cycle &C,
       LLVM_DEBUG(dbgs() << "added block from child: " << BB->getName() << "\n");
     }
   }
+  for (auto *BB : CallBrPreds) {
+    NewLoop->addBlockEntry(BB);
+    if (LI.getLoopFor(BB) == ParentLoop) {
+      LLVM_DEBUG(dbgs() << "moved block from parent: " << BB->getName()
+                        << "\n");
+      LI.changeLoopFor(BB, NewLoop);
+    } else {
+      LLVM_DEBUG(dbgs() << "added block from child: " << BB->getName() << "\n");
+    }
+  }
   LLVM_DEBUG(dbgs() << "header for new loop: "
                     << NewLoop->getHeader()->getName() << "\n");
 
@@ -281,6 +291,7 @@ static bool fixIrreducible(Cycle &C, CycleInfo &CI, DominatorTree &DT,
   DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Eager);
   ControlFlowHub CHub;
   SetVector<BasicBlock *> Predecessors;
+  SmallPtrSet<BasicBlock *, 2> CallBrPreds;
 
   // Redirect internal edges incident on the header.
   BasicBlock *Header = C.getHeader();
@@ -313,7 +324,8 @@ static bool fixIrreducible(Cycle &C, CycleInfo &CI, DominatorTree &DT,
         BasicBlock *Succ = CallBr->getSuccessor(I);
         if (Succ != Header)
           continue;
-        BasicBlock *NewSucc = SplitCallBrEdge(P, Succ, I, &DTU, &CI, LI);
+        BasicBlock *NewSucc = SplitCallBrEdge(P, Succ, I, &DTU, LI);
+        CallBrPreds.insert(NewSucc);
         CHub.addBranch(NewSucc, Succ);
         LLVM_DEBUG(dbgs() << "Added internal branch: "
                           << printBasicBlock(NewSucc) << " -> "
@@ -326,9 +338,11 @@ static bool fixIrreducible(Cycle &C, CycleInfo &CI, DominatorTree &DT,
 
   // Redirect external incoming edges. This includes the edges on the header.
   Predecessors.clear();
+  LLVM_DEBUG(CI.print(dbgs()));
   for (BasicBlock *E : C.entries()) {
     for (BasicBlock *P : predecessors(E)) {
-      if (!C.contains(P))
+      LLVM_DEBUG(dbgs() << "Pred: " << printBasicBlock(P) << "\n");
+      if (!C.contains(P) && !CallBrPreds.contains(P))
         Predecessors.insert(P);
     }
   }
@@ -357,7 +371,7 @@ static bool fixIrreducible(Cycle &C, CycleInfo &CI, DominatorTree &DT,
         BasicBlock *Succ = CallBr->getSuccessor(I);
         if (!C.contains(Succ))
           continue;
-        BasicBlock *NewSucc = SplitCallBrEdge(P, Succ, I, &DTU, &CI, LI);
+        BasicBlock *NewSucc = SplitCallBrEdge(P, Succ, I, &DTU, LI);
         CHub.addBranch(NewSucc, Succ);
         LLVM_DEBUG(dbgs() << "Added external branch: "
                           << printBasicBlock(NewSucc) << " -> "
@@ -391,18 +405,7 @@ static bool fixIrreducible(Cycle &C, CycleInfo &CI, DominatorTree &DT,
   // If we are updating LoopInfo, do that now before modifying the cycle. This
   // ensures that the first guard block is the header of a new natural loop.
   if (LI)
-    updateLoopInfo(*LI, C, GuardBlocks);
-
-  for (auto *G : GuardBlocks) {
-    LLVM_DEBUG(dbgs() << "added guard block to cycle: " << G->getName()
-                      << "\n");
-    CI.addBlockToCycle(G, &C);
-  }
-  C.setSingleEntry(GuardBlocks[0]);
-
-  C.verifyCycle();
-  if (Cycle *Parent = C.getParentCycle())
-    Parent->verifyCycle();
+    updateLoopInfo(*LI, C, GuardBlocks, CallBrPreds);
 
   LLVM_DEBUG(dbgs() << "Finished one cycle:\n"; CI.print(dbgs()););
   return true;
@@ -424,7 +427,6 @@ static bool FixIrreducibleImpl(Function &F, CycleInfo &CI, DominatorTree &DT,
     return false;
 
 #if defined(EXPENSIVE_CHECKS)
-  CI.verify();
   if (LI) {
     LI->verify(DT);
   }
@@ -452,7 +454,6 @@ PreservedAnalyses FixIrreduciblePass::run(Function &F,
 
   PreservedAnalyses PA;
   PA.preserve<LoopAnalysis>();
-  PA.preserve<CycleAnalysis>();
   PA.preserve<DominatorTreeAnalysis>();
   return PA;
 }

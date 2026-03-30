@@ -78,9 +78,6 @@ struct BlockInfoType {
   /// True when this block contains a live instructions.
   bool Live = false;
 
-  /// True when this block ends in an unconditional branch.
-  bool UnconditionalBranch = false;
-
   /// True when this block is known to have live PHI nodes.
   bool HasLivePhiNodes = false;
 
@@ -89,9 +86,6 @@ struct BlockInfoType {
 
   /// Post-order numbering of reverse control flow graph.
   unsigned PostOrder = 0;
-
-  /// Cache of BB->getTerminator().
-  Instruction *Terminator = nullptr;
 };
 
 struct ADCEChanged {
@@ -196,15 +190,8 @@ ADCEChanged AggressiveDeadCodeElimination::performDeadCodeElimination() {
 void AggressiveDeadCodeElimination::initialize() {
   BlockInfo.resize(F.getMaxBlockNumber());
   size_t NumInsts = 0;
-
-  // Iterate over blocks and initialize BlockInfoVec entries.
-  for (auto &BB : F) {
+  for (auto &BB : F)
     NumInsts += BB.size();
-    auto &Info = BlockInfo[BB.getNumber()];
-    Info.Terminator = BB.getTerminator();
-    Info.UnconditionalBranch = isa<UncondBrInst>(Info.Terminator);
-  }
-
   LiveInst.reserve(NumInsts);
 
   // Collect the set of "root" instructions that are known live.
@@ -229,9 +216,8 @@ void AggressiveDeadCodeElimination::initialize() {
   // program, and for all others, mark the subtree live.
   for (const auto &PDTChild : children<DomTreeNode *>(PDT.getRootNode())) {
     auto *BB = PDTChild->getBlock();
-    auto &Info = BlockInfo[BB->getNumber()];
     // Real function return
-    if (isa<ReturnInst>(Info.Terminator)) {
+    if (isa<ReturnInst>(BB->back())) {
       LLVM_DEBUG(dbgs() << "post-dom root child is a return: " << BB->getName()
                         << '\n';);
       continue;
@@ -239,22 +225,19 @@ void AggressiveDeadCodeElimination::initialize() {
 
     // This child is something else, like an infinite loop.
     for (auto *DFNode : depth_first(PDTChild))
-      markLive(BlockInfo[DFNode->getBlock()->getNumber()].Terminator);
+      markLive(&DFNode->getBlock()->back());
   }
 
   // Treat the entry block as always live
   auto *BB = &F.getEntryBlock();
   auto &EntryInfo = BlockInfo[BB->getNumber()];
   EntryInfo.Live = true;
-  if (EntryInfo.UnconditionalBranch)
-    markLive(EntryInfo.Terminator);
+  if (isa<UncondBrInst>(BB->back()))
+    markLive(&BB->back());
 
   // Build initial collection of blocks with dead terminators
-  // NB: getTerminator() is inefficient if the instruction is not dereferenced,
-  // because it must account for the case that there is no terminator. Use our
-  // cached terminator instead.
   for (auto &BB : F)
-    if (!isLive(BlockInfo[BB.getNumber()].Terminator))
+    if (!isLive(&BB.back()))
       BlocksWithDeadTerminators.insert(&BB);
 }
 
@@ -324,12 +307,11 @@ void AggressiveDeadCodeElimination::markLive(Instruction *I) {
 
   // Mark the containing block live
   BasicBlock *BB = I->getParent();
-  auto &BBInfo = BlockInfo[BB->getNumber()];
-  if (BBInfo.Terminator == I) {
+  if (I == &BB->back()) {
     BlocksWithDeadTerminators.remove(BB);
     // For live terminators, mark destination blocks
     // live to preserve this control flow edges.
-    if (!BBInfo.UnconditionalBranch)
+    if (!isa<UncondBrInst>(I))
       for (auto *Succ : I->successors())
         markLive(Succ);
   }
@@ -349,8 +331,8 @@ void AggressiveDeadCodeElimination::markLive(BasicBlock *BB) {
 
   // Mark unconditional branches at the end of live
   // blocks as live since there is no work to do for them later
-  if (BBInfo.UnconditionalBranch)
-    markLive(BBInfo.Terminator);
+  if (isa<UncondBrInst>(BB->back()))
+    markLive(&BB->back());
 }
 
 void AggressiveDeadCodeElimination::collectLiveScopes(const DILocalScope &LS) {
@@ -528,9 +510,8 @@ bool AggressiveDeadCodeElimination::updateDeadRegions() {
   SmallVector<DominatorTree::UpdateType, 10> DeletedEdges;
 
   for (auto *BB : BlocksWithDeadTerminators) {
-    auto &Info = BlockInfo[BB->getNumber()];
-    if (Info.UnconditionalBranch) {
-      LiveInst.insert(Info.Terminator);
+    if (isa<UncondBrInst>(BB->back())) {
+      LiveInst.insert(&BB->back());
       continue;
     }
 

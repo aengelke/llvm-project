@@ -189,10 +189,6 @@ ADCEChanged AggressiveDeadCodeElimination::performDeadCodeElimination() {
 
 void AggressiveDeadCodeElimination::initialize() {
   BlockInfo.resize(F.getMaxBlockNumber());
-  size_t NumInsts = 0;
-  for (auto &BB : F)
-    NumInsts += BB.size();
-  LiveInst.reserve(NumInsts);
 
   // Collect the set of "root" instructions that are known live.
   for (Instruction &I : instructions(F))

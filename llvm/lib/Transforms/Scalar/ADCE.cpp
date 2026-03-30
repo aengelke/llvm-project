@@ -90,9 +90,6 @@ struct BlockInfoType {
   /// Post-order numbering of reverse control flow graph.
   unsigned PostOrder = 0;
 
-  /// Corresponding BasicBlock.
-  BasicBlock *BB = nullptr;
-
   /// Cache of BB->getTerminator().
   Instruction *Terminator = nullptr;
 };
@@ -114,7 +111,6 @@ class AggressiveDeadCodeElimination {
   /// Mapping of blocks to associated information, an element in BlockInfoVec.
   /// Use MapVector to get deterministic iteration order.
   SmallVector<BlockInfoType> BlockInfo;
-  bool isLive(BasicBlock *BB) { return BlockInfo[BB->getNumber()].Live; }
 
   /// Set of live instructions.
   DenseSet<Instruction *> LiveInst;
@@ -152,8 +148,7 @@ class AggressiveDeadCodeElimination {
   void markLive(Instruction *I);
 
   /// Mark a block as live.
-  void markLive(BlockInfoType &BB);
-  void markLive(BasicBlock *BB) { markLive(BlockInfo[BB->getNumber()]); }
+  void markLive(BasicBlock *BB);
 
   /// Mark terminators of control predecessors of a PHI node live.
   void markPhiLive(PHINode *PN);
@@ -206,7 +201,6 @@ void AggressiveDeadCodeElimination::initialize() {
   for (auto &BB : F) {
     NumInsts += BB.size();
     auto &Info = BlockInfo[BB.getNumber()];
-    Info.BB = &BB;
     Info.Terminator = BB.getTerminator();
     Info.UnconditionalBranch = isa<UncondBrInst>(Info.Terminator);
   }
@@ -256,9 +250,12 @@ void AggressiveDeadCodeElimination::initialize() {
     markLive(EntryInfo.Terminator);
 
   // Build initial collection of blocks with dead terminators
-  for (auto &BBInfo : BlockInfo)
-    if (BBInfo.Terminator && !isLive(BBInfo.Terminator))
-      BlocksWithDeadTerminators.insert(BBInfo.BB);
+  // NB: getTerminator() is inefficient if the instruction is not dereferenced,
+  // because it must account for the case that there is no terminator. Use our
+  // cached terminator instead.
+  for (auto &BB : F)
+    if (!isLive(BlockInfo[BB.getNumber()].Terminator))
+      BlocksWithDeadTerminators.insert(&BB);
 }
 
 bool AggressiveDeadCodeElimination::isAlwaysLive(Instruction &I) {
@@ -326,26 +323,28 @@ void AggressiveDeadCodeElimination::markLive(Instruction *I) {
     collectLiveScopes(*DL);
 
   // Mark the containing block live
-  auto &BBInfo = BlockInfo[I->getParent()->getNumber()];
+  BasicBlock *BB = I->getParent();
+  auto &BBInfo = BlockInfo[BB->getNumber()];
   if (BBInfo.Terminator == I) {
-    BlocksWithDeadTerminators.remove(BBInfo.BB);
+    BlocksWithDeadTerminators.remove(BB);
     // For live terminators, mark destination blocks
     // live to preserve this control flow edges.
     if (!BBInfo.UnconditionalBranch)
-      for (auto *BB : I->successors())
-        markLive(BB);
+      for (auto *Succ : I->successors())
+        markLive(Succ);
   }
-  markLive(BBInfo);
+  markLive(BB);
 }
 
-void AggressiveDeadCodeElimination::markLive(BlockInfoType &BBInfo) {
+void AggressiveDeadCodeElimination::markLive(BasicBlock *BB) {
+  auto &BBInfo = BlockInfo[BB->getNumber()];
   if (BBInfo.Live)
     return;
-  LLVM_DEBUG(dbgs() << "mark block live: " << BBInfo.BB->getName() << '\n');
+  LLVM_DEBUG(dbgs() << "mark block live: " << BB->getName() << '\n');
   BBInfo.Live = true;
   if (!BBInfo.CFLive) {
     BBInfo.CFLive = true;
-    NewLiveBlocks.insert(BBInfo.BB);
+    NewLiveBlocks.insert(BB);
   }
 
   // Mark unconditional branches at the end of live
@@ -389,7 +388,7 @@ void AggressiveDeadCodeElimination::markPhiLive(PHINode *PN) {
   // If a predecessor block is not live, mark it as control-flow live
   // which will trigger marking live branches upon which
   // that block is control dependent.
-  for (auto *PredBB : predecessors(Info.BB)) {
+  for (auto *PredBB : predecessors(PN->getParent())) {
     auto &Info = BlockInfo[PredBB->getNumber()];
     if (!Info.CFLive) {
       Info.CFLive = true;
@@ -543,32 +542,35 @@ bool AggressiveDeadCodeElimination::updateDeadRegions() {
     // Add an unconditional branch to the successor closest to the
     // end of the function which insures a path to the exit for each
     // live edge.
-    BlockInfoType *PreferredSucc = nullptr;
+    BasicBlock *PreferredSucc = nullptr;
+    unsigned PreferredSuccPostOrder = 0;
     for (auto *Succ : successors(BB)) {
-      auto *Info = &BlockInfo[Succ->getNumber()];
-      if (!PreferredSucc || PreferredSucc->PostOrder < Info->PostOrder)
-        PreferredSucc = Info;
+      unsigned SuccPostOrder = BlockInfo[Succ->getNumber()].PostOrder;
+      if (PreferredSuccPostOrder < SuccPostOrder) {
+        PreferredSucc = Succ;
+        PreferredSuccPostOrder = SuccPostOrder;
+      }
     }
-    assert((PreferredSucc && PreferredSucc->PostOrder > 0) &&
+    assert((PreferredSucc && PreferredSuccPostOrder > 0) &&
            "Failed to find safe successor for dead branch");
 
     // Collect removed successors to update the (Post)DominatorTrees.
     SmallPtrSet<BasicBlock *, 4> RemovedSuccessors;
     bool First = true;
     for (auto *Succ : successors(BB)) {
-      if (!First || Succ != PreferredSucc->BB) {
+      if (!First || Succ != PreferredSucc) {
         Succ->removePredecessor(BB);
         RemovedSuccessors.insert(Succ);
       } else
         First = false;
     }
-    makeUnconditional(BB, PreferredSucc->BB);
+    makeUnconditional(BB, PreferredSucc);
 
     // Inform the dominators about the deleted CFG edges.
     for (auto *Succ : RemovedSuccessors) {
       // It might have happened that the same successor appeared multiple times
       // and the CFG edge wasn't really removed.
-      if (Succ != PreferredSucc->BB) {
+      if (Succ != PreferredSucc) {
         LLVM_DEBUG(dbgs() << "ADCE: (Post)DomTree edge enqueued for deletion"
                           << BB->getName() << " -> " << Succ->getName()
                           << "\n");

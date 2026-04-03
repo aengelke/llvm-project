@@ -501,15 +501,15 @@ class IRBuilderPrefixedInserter final : public IRBuilderDefaultInserter {
   std::string Prefix;
 
   Twine getNameWithPrefix(const Twine &Name) const {
-#ifndef NDEBUG
     return Name.isTriviallyEmpty() ? Name : Prefix + Name;
-#else
-    return Name;
-#endif
   }
 
 public:
+#ifndef NDEBUG
   void SetNamePrefix(const Twine &P) { Prefix = P.str(); }
+#else
+  void SetNamePrefix(const Twine &P) {}
+#endif
 
   void InsertHelper(Instruction *I, const Twine &Name,
                     BasicBlock::iterator InsertPt) const override {

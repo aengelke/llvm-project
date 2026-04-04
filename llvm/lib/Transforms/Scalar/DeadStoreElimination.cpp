@@ -973,7 +973,7 @@ struct DSEState {
   SmallPtrSet<BasicBlock *, 16> ThrowingBlocks;
   // Post-order numbers for each basic block. Used to figure out if memory
   // accesses are executed before another access.
-  DenseMap<BasicBlock *, unsigned> PostOrderNumbers;
+  SmallVector<unsigned> PostOrderNumbers;
 
   /// Keep track of instructions (partly) overlapping with killing MemoryDefs per
   /// basic block.
@@ -1177,8 +1177,10 @@ DSEState::DSEState(Function &F, AliasAnalysis &AA, MemorySSA &MSSA,
   // Collect blocks with throwing instructions not modeled in MemorySSA and
   // alloc-like objects.
   unsigned PO = 0;
+  // We initialize all basic blocks, so no need to initialize the vector.
+  PostOrderNumbers.resize_for_overwrite(F.getMaxBlockNumber());
   for (BasicBlock *BB : post_order(&F)) {
-    PostOrderNumbers[BB] = PO++;
+    PostOrderNumbers[BB->getNumber()] = PO++;
     for (Instruction &I : *BB) {
       MemoryAccess *MA = MSSA.getMemoryAccess(&I);
       if (I.mayThrow() && !MA)
@@ -1909,8 +1911,8 @@ std::optional<MemoryAccess *> DSEState::getDomMemoryDef(
     if (MemoryDef *UseDef = dyn_cast<MemoryDef>(UseAccess)) {
       if (isCompleteOverwrite(MaybeDeadLoc, MaybeDeadI, UseInst)) {
         BasicBlock *MaybeKillingBlock = UseInst->getParent();
-        if (PostOrderNumbers.find(MaybeKillingBlock)->second <
-            PostOrderNumbers.find(MaybeDeadAccess->getBlock())->second) {
+        if (PostOrderNumbers[MaybeKillingBlock->getNumber()] <
+            PostOrderNumbers[MaybeDeadAccess->getBlock()->getNumber()]) {
           if (!isInvisibleToCallerAfterRet(KillingUndObj, KillingLoc.Ptr,
                                            KillingLoc.Size)) {
             LLVM_DEBUG(dbgs()
@@ -2632,7 +2634,8 @@ DSEState::eliminateDeadDefs(const MemoryLocationWrapper &KillingLocWrapper) {
         // We only consider incoming MemoryAccesses that come before the
         // MemoryPhi. Otherwise we could discover candidates that do not
         // strictly dominate our starting def.
-        if (PostOrderNumbers[IncomingBlock] > PostOrderNumbers[PhiBlock])
+        if (PostOrderNumbers[IncomingBlock->getNumber()] >
+            PostOrderNumbers[PhiBlock->getNumber()])
           ToCheck.insert(IncomingAccess);
       }
       continue;

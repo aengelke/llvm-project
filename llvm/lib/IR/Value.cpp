@@ -647,8 +647,10 @@ static const Value *stripPointerCastsAndOffsets(
   //
   // Bound against that case with a simple iteration counter. Practically, more
   // than 10 iterations are almost never needed.
-  for (unsigned N = 0; N < 12; ++N) {
+  unsigned InstrDepth = 0;
+  while (InstrDepth < 12) {
     Func(V);
+    InstrDepth += isa<Instruction>(V);
     if (auto *GEP = dyn_cast<GEPOperator>(V)) {
       switch (StripKind) {
       case PSK_ZeroIndices:

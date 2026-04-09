@@ -83,7 +83,7 @@ protected:
   ProfileSummaryInfo *PSI;
   DomConditionCache DC;
 
-  ReversePostOrderTraversal<BasicBlock *> &RPOT;
+  ReversePostOrderTraversal<Function *> &RPOT;
 
   bool MadeIRChange = false;
 
@@ -106,7 +106,7 @@ public:
                OptimizationRemarkEmitter &ORE, BlockFrequencyInfo *BFI,
                BranchProbabilityInfo *BPI, ProfileSummaryInfo *PSI,
                const DataLayout &DL,
-               ReversePostOrderTraversal<BasicBlock *> &RPOT)
+               ReversePostOrderTraversal<Function *> &RPOT)
       : TTIForTargetIntrinsicsOnly(TTI), Builder(Builder), Worklist(Worklist),
         F(F), MinimizeSize(F.hasMinSize()), AA(AA), AC(AC), TLI(TLI), DT(DT),
         DL(DL), SQ(DL, &TLI, &DT, &AC, nullptr, /*UseInstrInfo*/ true,

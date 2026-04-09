@@ -6175,7 +6175,7 @@ static bool combineInstructionsOverFunction(
           AC.registerAssumption(Assume);
       }));
 
-  ReversePostOrderTraversal<BasicBlock *> RPOT(&F.front());
+  ReversePostOrderTraversal<Function *> RPOT(&F);
 
   // Lower dbg.declare intrinsics otherwise their value may be clobbered
   // by instcombiner.

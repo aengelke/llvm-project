@@ -514,6 +514,7 @@ static void discoverAndMapSubloop(LoopT *L, ArrayRef<BlockT *> Backedges,
 /// Populate all loop data in a stable order during a single forward DFS.
 template <class BlockT, class LoopT> class PopulateLoopsDFS {
   using BlockTraits = GraphTraits<BlockT *>;
+  using ParentT = decltype(std::declval<BlockT *>()->getParent());
   using SuccIterTy = typename BlockTraits::ChildIteratorType;
 
   LoopInfoBase<BlockT, LoopT> *LI;
@@ -521,7 +522,7 @@ template <class BlockT, class LoopT> class PopulateLoopsDFS {
 public:
   PopulateLoopsDFS(LoopInfoBase<BlockT, LoopT> *li) : LI(li) {}
 
-  void traverse(BlockT *EntryBlock);
+  void traverse(ParentT ParentPtr);
 
 protected:
   void insertIntoLoop(BlockT *Block);
@@ -529,8 +530,8 @@ protected:
 
 /// Top-level driver for the forward DFS within the loop.
 template <class BlockT, class LoopT>
-void PopulateLoopsDFS<BlockT, LoopT>::traverse(BlockT *EntryBlock) {
-  for (BlockT *BB : post_order(EntryBlock))
+void PopulateLoopsDFS<BlockT, LoopT>::traverse(ParentT Parent) {
+  for (BlockT *BB : post_order(Parent))
     insertIntoLoop(BB);
 }
 
@@ -605,7 +606,7 @@ void LoopInfoBase<BlockT, LoopT>::analyze(const DomTreeBase<BlockT> &DomTree) {
   // Perform a single forward CFG traversal to populate block and subloop
   // vectors for all loops.
   PopulateLoopsDFS<BlockT, LoopT> DFS(this);
-  DFS.traverse(DomRoot->getBlock());
+  DFS.traverse(DomRoot->getBlock()->getParent());
 }
 
 template <class BlockT, class LoopT>

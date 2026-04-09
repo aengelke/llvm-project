@@ -402,7 +402,7 @@ bool SVEIntrinsicOpts::optimizeInstructions(
     // Traverse the DT with an rpo walk so we see defs before uses, allowing
     // simplification to be done incrementally.
     BasicBlock *Root = DT->getRoot();
-    ReversePostOrderTraversal<BasicBlock *> RPOT(Root);
+    ReversePostOrderTraversal<Function *> RPOT(F);
     for (auto *BB : RPOT) {
       for (Instruction &I : make_early_inc_range(*BB)) {
         switch (I.getOpcode()) {

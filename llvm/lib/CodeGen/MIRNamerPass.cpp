@@ -49,7 +49,7 @@ public:
 
     VRegRenamer Renamer(MF.getRegInfo());
 
-    ReversePostOrderTraversal<MachineBasicBlock *> RPOT(&*MF.begin());
+    ReversePostOrderTraversal<MachineFunction *> RPOT(&MF);
     for (const auto &[BBIndex, MBB] : enumerate(RPOT))
       Changed |= Renamer.renameVRegs(MBB, BBIndex);
 

@@ -76,7 +76,7 @@ INITIALIZE_PASS_END(MIRCanonicalizer, "mir-canonicalizer",
 static std::vector<MachineBasicBlock *> GetRPOList(MachineFunction &MF) {
   if (MF.empty())
     return {};
-  ReversePostOrderTraversal<MachineBasicBlock *> RPOT(&*MF.begin());
+  ReversePostOrderTraversal<MachineFunction *> RPOT(&MF);
   std::vector<MachineBasicBlock *> RPOList;
   append_range(RPOList, RPOT);
 

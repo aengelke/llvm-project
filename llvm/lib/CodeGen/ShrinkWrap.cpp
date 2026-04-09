@@ -199,7 +199,7 @@ class ShrinkWrapImpl {
   // Try to find safe point based on dominance and block frequency without
   // any change in IR.
   bool performShrinkWrapping(
-      const ReversePostOrderTraversal<MachineBasicBlock *> &RPOT,
+      const ReversePostOrderTraversal<MachineFunction *> &RPOT,
       RegScavenger *RS);
 
   /// This function tries to split the restore point if doing so can shrink the
@@ -830,7 +830,7 @@ static bool giveUpWithRemarks(MachineOptimizationRemarkEmitter *ORE,
 }
 
 bool ShrinkWrapImpl::performShrinkWrapping(
-    const ReversePostOrderTraversal<MachineBasicBlock *> &RPOT,
+    const ReversePostOrderTraversal<MachineFunction *> &RPOT,
     RegScavenger *RS) {
   for (MachineBasicBlock *MBB : RPOT) {
     LLVM_DEBUG(dbgs() << "Look into: " << printMBBReference(*MBB) << '\n');
@@ -943,7 +943,7 @@ bool ShrinkWrapImpl::run(MachineFunction &MF) {
 
   init(MF);
 
-  ReversePostOrderTraversal<MachineBasicBlock *> RPOT(&*MF.begin());
+  ReversePostOrderTraversal<MachineFunction *> RPOT(&MF);
   if (containsIrreducibleCFG<MachineBasicBlock *>(RPOT, *MLI)) {
     // If MF is irreducible, a block may be in a loop without
     // MachineLoopInfo reporting it. I.e., we may use the

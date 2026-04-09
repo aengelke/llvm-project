@@ -149,7 +149,7 @@ computeBlockInfo(const MachineFunction &MF,
   BlockInfo[0].StrongNoFrameOnEntry = true;
 
   // Compute the presence/absence of frame at each basic block.
-  ReversePostOrderTraversal<const MachineBasicBlock *> RPOT(&*MF.begin());
+  ReversePostOrderTraversal<const MachineFunction *> RPOT(&MF);
   for (const MachineBasicBlock *MBB : RPOT) {
     BlockFlags &Info = BlockInfo[MBB->getNumber()];
 

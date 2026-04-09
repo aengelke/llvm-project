@@ -183,6 +183,8 @@ public:
 
   PostOrderTraversal(const GraphT &G) {
     this->init(GraphTraits<GraphT>::getEntryNode(G));
+    if constexpr (GraphHasNodeNumbers<GraphT>)
+      Visited.reserve(GraphTraits<GraphT>::getMaxNumber(G));
   }
 
   PostOrderTraversal(const GraphT &G, SetType &S) : Visited(S) {

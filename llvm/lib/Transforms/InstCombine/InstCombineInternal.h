@@ -68,7 +68,7 @@ public:
                    DominatorTree &DT, OptimizationRemarkEmitter &ORE,
                    BlockFrequencyInfo *BFI, BranchProbabilityInfo *BPI,
                    ProfileSummaryInfo *PSI, const DataLayout &DL,
-                   ReversePostOrderTraversal<BasicBlock *> &RPOT)
+                   ReversePostOrderTraversal<Function *> &RPOT)
       : InstCombiner(Worklist, Builder, F, AA, AC, TLI, TTI, DT, ORE, BFI, BPI,
                      PSI, DL, RPOT) {}
 

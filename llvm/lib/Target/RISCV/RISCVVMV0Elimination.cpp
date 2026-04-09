@@ -90,7 +90,7 @@ bool RISCVVMV0Elimination::runOnMachineFunction(MachineFunction &MF) {
   // Assert that we won't clobber any existing reads of v0 where we need to
   // insert copies.
   const TargetRegisterInfo *TRI = MRI.getTargetRegisterInfo();
-  ReversePostOrderTraversal<MachineBasicBlock *> RPOT(&*MF.begin());
+  ReversePostOrderTraversal<MachineFunction *> RPOT(&MF);
   for (MachineBasicBlock *MBB : RPOT) {
     bool V0Clobbered = false;
     for (MachineInstr &MI : *MBB) {

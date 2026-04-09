@@ -687,7 +687,8 @@ public:
   /// Add the specified range to the end of the SmallVector.
   template <typename ItTy, typename = EnableIfConvertibleToInputIterator<ItTy>>
   void append(ItTy in_start, ItTy in_end) {
-    if constexpr (HasIteratorTag<ItTy, std::forward_iterator_tag>::value) {
+    if constexpr (HasIteratorTag<ItTy,
+                                 std::random_access_iterator_tag>::value) {
       this->assertSafeToAddRange(in_start, in_end);
       size_type NumInputs = std::distance(in_start, in_end);
       this->reserve(this->size() + NumInputs);

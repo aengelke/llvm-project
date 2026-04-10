@@ -298,6 +298,8 @@ public:
   const FunctionT *getFunction() const { return Context.getFunction(); }
   const ContextT &getSSAContext() const { return Context; }
 
+  bool empty() const { return TopLevelCycles.empty(); }
+
   CycleT *getCycle(const BlockT *Block) const;
   CycleT *getSmallestCommonCycle(CycleT *A, CycleT *B) const;
   CycleT *getSmallestCommonCycle(BlockT *A, BlockT *B) const;

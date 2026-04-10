@@ -1559,12 +1559,10 @@ void PGOUseFunc::populateCoverage() {
   }
 
   unsigned NumCorruptCoverage = 0;
-  DominatorTree DT(F);
   CycleInfo CI;
   CI.compute(F);
-  LoopInfo LI(DT);
   BranchProbabilityInfo BPI(F, CI);
-  BlockFrequencyInfo BFI(F, BPI, LI);
+  BlockFrequencyInfo BFI(F, BPI, CI);
   auto IsBlockDead = [&](const BasicBlock &BB) -> std::optional<bool> {
     if (auto C = BFI.getBlockProfileCount(&BB))
       return C == 0;
@@ -2027,10 +2025,10 @@ PreservedAnalyses PGOInstrumentationGen::run(Module &M,
 
 // Using the ratio b/w sums of profile count values and BFI count values to
 // adjust the func entry count.
-static void fixFuncEntryCount(PGOUseFunc &Func, LoopInfo &LI,
+static void fixFuncEntryCount(PGOUseFunc &Func, CycleInfo &CI,
                               BranchProbabilityInfo &NBPI) {
   Function &F = Func.getFunc();
-  BlockFrequencyInfo NBFI(F, NBPI, LI);
+  BlockFrequencyInfo NBFI(F, NBPI, CI);
 #ifndef NDEBUG
   auto BFIEntryCount = F.getEntryCount();
   assert(BFIEntryCount && (BFIEntryCount->getCount() > 0) &&
@@ -2074,12 +2072,12 @@ static void fixFuncEntryCount(PGOUseFunc &Func, LoopInfo &LI,
 
 // Compare the profile count values with BFI count values, and print out
 // the non-matching ones.
-static void verifyFuncBFI(PGOUseFunc &Func, LoopInfo &LI,
+static void verifyFuncBFI(PGOUseFunc &Func, CycleInfo &CI,
                           BranchProbabilityInfo &NBPI,
                           uint64_t HotCountThreshold,
                           uint64_t ColdCountThreshold) {
   Function &F = Func.getFunc();
-  BlockFrequencyInfo NBFI(F, NBPI, LI);
+  BlockFrequencyInfo NBFI(F, NBPI, CI);
   //  bool PrintFunc = false;
   bool HotBBOnly = PGOVerifyHotBFI;
   StringRef Msg;
@@ -2283,13 +2281,12 @@ static bool annotateAllFunctions(
     if (PGOViewCounts != PGOVCT_None &&
         (ViewBlockFreqFuncName.empty() ||
          F.getName() == ViewBlockFreqFuncName)) {
-      LoopInfo LI{DominatorTree(F)};
       CycleInfo CI;
       CI.compute(F);
       std::unique_ptr<BranchProbabilityInfo> NewBPI =
           std::make_unique<BranchProbabilityInfo>(F, CI);
       std::unique_ptr<BlockFrequencyInfo> NewBFI =
-          std::make_unique<BlockFrequencyInfo>(F, *NewBPI, LI);
+          std::make_unique<BlockFrequencyInfo>(F, *NewBPI, CI);
       if (PGOViewCounts == PGOVCT_Graph)
         NewBFI->view();
       else if (PGOViewCounts == PGOVCT_Text) {
@@ -2314,12 +2311,11 @@ static bool annotateAllFunctions(
     if (PGOVerifyBFI || PGOVerifyHotBFI || PGOFixEntryCount) {
       CycleInfo CI;
       CI.compute(F);
-      LoopInfo LI{DominatorTree(F)};
       BranchProbabilityInfo NBPI(F, CI);
 
       // Fix func entry count.
       if (PGOFixEntryCount)
-        fixFuncEntryCount(Func, LI, NBPI);
+        fixFuncEntryCount(Func, CI, NBPI);
 
       // Verify BlockFrequency information.
       uint64_t HotCountThreshold = 0, ColdCountThreshold = 0;
@@ -2327,7 +2323,7 @@ static bool annotateAllFunctions(
         HotCountThreshold = PSI->getOrCompHotCountThreshold();
         ColdCountThreshold = PSI->getOrCompColdCountThreshold();
       }
-      verifyFuncBFI(Func, LI, NBPI, HotCountThreshold, ColdCountThreshold);
+      verifyFuncBFI(Func, CI, NBPI, HotCountThreshold, ColdCountThreshold);
     }
   }
 

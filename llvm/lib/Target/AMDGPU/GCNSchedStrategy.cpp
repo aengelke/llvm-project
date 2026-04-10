@@ -2928,9 +2928,10 @@ void PreRARematStage::RematReg::insertMI(unsigned RegionIdx,
 
 PreRARematStage::ScoredRemat::FreqInfo::FreqInfo(
     MachineFunction &MF, const GCNScheduleDAGMILive &DAG) {
-  assert(DAG.MLI && "MLI not defined in DAG");
   MachineBranchProbabilityInfo MBPI;
-  MachineBlockFrequencyInfo MBFI(MF, MBPI, *DAG.MLI);
+  MachineCycleInfo MCI;
+  MCI.compute(MF);
+  MachineBlockFrequencyInfo MBFI(MF, MBPI, MCI);
 
   const unsigned NumRegions = DAG.Regions.size();
   MinFreq = MBFI.getEntryFreq().getFrequency();

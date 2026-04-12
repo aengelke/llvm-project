@@ -15466,6 +15466,8 @@ PredicatedScalarEvolution::PredicatedScalarEvolution(ScalarEvolution &SE,
   Preds = std::make_unique<SCEVUnionPredicate>(Empty, SE);
 }
 
+PredicatedScalarEvolution::~PredicatedScalarEvolution() = default;
+
 void ScalarEvolution::registerUser(const SCEV *User,
                                    ArrayRef<const SCEV *> Ops) {
   for (const auto *Op : Ops)

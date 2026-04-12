@@ -3212,6 +3212,8 @@ void LoopAccessInfo::print(raw_ostream &OS, unsigned Depth) const {
   PSE->print(OS, Depth);
 }
 
+LoopAccessInfoManager::~LoopAccessInfoManager() = default;
+
 const LoopAccessInfo &LoopAccessInfoManager::getInfo(Loop &L,
                                                      bool AllowPartial) {
   const auto &[It, Inserted] = LoopAccessInfoMap.try_emplace(&L);

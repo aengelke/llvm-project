@@ -2600,6 +2600,7 @@ public:
 class PredicatedScalarEvolution {
 public:
   LLVM_ABI PredicatedScalarEvolution(ScalarEvolution &SE, Loop &L);
+  LLVM_ABI ~PredicatedScalarEvolution();
 
   LLVM_ABI const SCEVPredicate &getPredicate() const;
 

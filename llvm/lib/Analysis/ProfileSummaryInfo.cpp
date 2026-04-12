@@ -48,6 +48,8 @@ static cl::opt<double> PartialSampleProfileWorkingSetSizeScaleFactor(
 
 } // end namespace llvm
 
+ProfileSummaryInfo::~ProfileSummaryInfo() = default;
+
 // The profile summary metadata may be attached either by the frontend or by
 // any backend passes (IR level instrumentation, for example). This method
 // checks if the Summary is null and if so checks if the summary metadata is now

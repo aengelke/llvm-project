@@ -978,6 +978,9 @@ public:
                         const TargetLibraryInfo *TLI, AssumptionCache *AC)
       : SE(SE), AA(AA), DT(DT), LI(LI), TTI(TTI), TLI(TLI), AC(AC) {}
 
+  LLVM_ABI ~LoopAccessInfoManager();
+  LoopAccessInfoManager(LoopAccessInfoManager &&) = default;
+
   LLVM_ABI const LoopAccessInfo &getInfo(Loop &L, bool AllowPartial = false);
 
   LLVM_ABI void clear();

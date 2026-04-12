@@ -64,6 +64,8 @@ public:
   ProfileSummaryInfo(const Module &M) : M(&M) { refresh(); }
   ProfileSummaryInfo(ProfileSummaryInfo &&Arg) = default;
 
+  LLVM_ABI ~ProfileSummaryInfo();
+
   /// If a summary is provided as argument, use that. Otherwise,
   /// if the `Summary` member is null, attempt to refresh.
   LLVM_ABI void refresh(std::unique_ptr<ProfileSummary> &&Other = nullptr);

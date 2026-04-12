@@ -1323,16 +1323,16 @@ private:
   const bool PrintMsgOnly = false;
 };
 
+LLVM_ABI Error createStringError(std::string &&Msg, std::error_code EC);
+
 /// Create formatted StringError object.
 template <typename... Ts>
 inline Error createStringError(std::error_code EC, char const *Fmt,
                                const Ts &... Vals) {
   std::string Buffer;
   raw_string_ostream(Buffer) << format(Fmt, Vals...);
-  return make_error<StringError>(std::move(Buffer), EC, true);
+  return createStringError(std::move(Buffer), EC);
 }
-
-LLVM_ABI Error createStringError(std::string &&Msg, std::error_code EC);
 
 inline Error createStringError(std::error_code EC, const char *S) {
   return createStringError(std::string(S), EC);

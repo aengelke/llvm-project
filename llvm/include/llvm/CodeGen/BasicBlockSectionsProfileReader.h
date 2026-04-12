@@ -150,10 +150,9 @@ private:
 
   // Returns a profile parsing error for the current line.
   Error createProfileParseError(Twine Message) const {
-    return make_error<StringError>(
+    return createStringError(
         Twine("invalid profile " + MBuf->getBufferIdentifier() + " at line " +
-              Twine(LineIt.line_number()) + ": " + Message),
-        inconvertibleErrorCode());
+              Twine(LineIt.line_number()) + ": " + Message));
   }
 
   // Parses a `UniqueBBID` from `S`. `S` must be in the form "<bbid>"

@@ -394,18 +394,18 @@ public:
   Expected<VertexAttribute &> at(const VertexIdentifier &I) {
     auto It = Vertices.find(I);
     if (It == Vertices.end())
-      return make_error<StringError>(
-          "Vertex Identifier Does Not Exist",
-          std::make_error_code(std::errc::invalid_argument));
+      return createStringError(
+          std::make_error_code(std::errc::invalid_argument),
+          "Vertex Identifier Does Not Exist");
     return It->second;
   }
 
   Expected<const VertexAttribute &> at(const VertexIdentifier &I) const {
     auto It = Vertices.find(I);
     if (It == Vertices.end())
-      return make_error<StringError>(
-          "Vertex Identifier Does Not Exist",
-          std::make_error_code(std::errc::invalid_argument));
+      return createStringError(
+          std::make_error_code(std::errc::invalid_argument),
+          "Vertex Identifier Does Not Exist");
     return It->second;
   }
 
@@ -413,18 +413,18 @@ public:
   Expected<EdgeAttribute &> at(const EdgeIdentifier &I) {
     auto It = Edges.find(I);
     if (It == Edges.end())
-      return make_error<StringError>(
-          "Edge Identifier Does Not Exist",
-          std::make_error_code(std::errc::invalid_argument));
+      return createStringError(
+          std::make_error_code(std::errc::invalid_argument),
+          "Edge Identifier Does Not Exist");
     return It->second;
   }
 
   Expected<const EdgeAttribute &> at(const EdgeIdentifier &I) const {
     auto It = Edges.find(I);
     if (It == Edges.end())
-      return make_error<StringError>(
-          "Edge Identifier Does Not Exist",
-          std::make_error_code(std::errc::invalid_argument));
+      return createStringError(
+          std::make_error_code(std::errc::invalid_argument),
+          "Edge Identifier Does Not Exist");
     return It->second;
   }
 

@@ -711,8 +711,7 @@ private:
   // Stop iteration and indicate an overflow.
   void stopWithOverflowError() {
     Nhdr = nullptr;
-    *Err = make_error<StringError>("ELF note overflows container",
-                                   object_error::parse_failed);
+    *Err = createError("ELF note overflows container");
   }
 
   // Advance Nhdr by NoteSize bytes, starting from NhdrPos.

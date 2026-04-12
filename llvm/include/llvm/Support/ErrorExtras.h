@@ -19,8 +19,7 @@ namespace llvm {
 template <typename... Ts>
 inline Error createStringErrorV(std::error_code EC, char const *Fmt,
                                 Ts &&...Vals) {
-  return make_error<StringError>(formatv(Fmt, std::forward<Ts>(Vals)...).str(),
-                                 EC, true);
+  return createStringError(EC, formatv(Fmt, std::forward<Ts>(Vals)...).str());
 }
 
 template <typename... Ts>

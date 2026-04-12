@@ -428,7 +428,7 @@ public:
     for (unsigned Size : DWARFContext::getSupportedAddressSizes())
       Stream << LS << Size;
     Stream << ')';
-    return make_error<StringError>(Buffer, EC);
+    return createStringError(EC, Buffer);
   }
 
   std::shared_ptr<DWARFContext> getDWOContext(StringRef AbsolutePath);

@@ -317,8 +317,7 @@ protected:
   /// addInstSelector - This method should install an instruction selector pass,
   /// which converts from LLVM code to machine instructions.
   Error addInstSelector(PassManagerWrapper &PMW) const {
-    return make_error<StringError>("addInstSelector is not overridden",
-                                   inconvertibleErrorCode());
+    return createStringError("addInstSelector is not overridden");
   }
 
   /// Target can override this to add GlobalMergePass before all IR passes.
@@ -385,8 +384,7 @@ protected:
   /// This method should install an IR translator pass, which converts from
   /// LLVM code to machine instructions with possibly generic opcodes.
   Error addIRTranslator(PassManagerWrapper &PMW) const {
-    return make_error<StringError>("addIRTranslator is not overridden",
-                                   inconvertibleErrorCode());
+    return createStringError("addIRTranslator is not overridden");
   }
 
   /// This method may be implemented by targets that want to run passes
@@ -396,8 +394,7 @@ protected:
   /// This method should install a legalize pass, which converts the instruction
   /// sequence into one that can be selected by the target.
   Error addLegalizeMachineIR(PassManagerWrapper &PMW) const {
-    return make_error<StringError>("addLegalizeMachineIR is not overridden",
-                                   inconvertibleErrorCode());
+    return createStringError("addLegalizeMachineIR is not overridden");
   }
 
   /// This method may be implemented by targets that want to run passes
@@ -408,8 +405,7 @@ protected:
   /// assigns register banks to virtual registers without a register
   /// class or register banks.
   Error addRegBankSelect(PassManagerWrapper &PMW) const {
-    return make_error<StringError>("addRegBankSelect is not overridden",
-                                   inconvertibleErrorCode());
+    return createStringError("addRegBankSelect is not overridden");
   }
 
   /// This method may be implemented by targets that want to run passes
@@ -421,9 +417,7 @@ protected:
   /// instructions, thereby constraining all generic virtual registers to
   /// register classes.
   Error addGlobalInstructionSelect(PassManagerWrapper &PMWM) const {
-    return make_error<StringError>(
-        "addGlobalInstructionSelect is not overridden",
-        inconvertibleErrorCode());
+    return createStringError("addGlobalInstructionSelect is not overridden");
   }
   /// @}}
 
@@ -683,13 +677,12 @@ Error CodeGenPassBuilder<Derived, TargetMachineT>::verifyStartStop(
     return Error::success();
 
   if (!Started)
-    return make_error<StringError>(
-        "Can't find start pass \"" + Info.StartPass + "\".",
-        std::make_error_code(std::errc::invalid_argument));
+    return createStringError(std::make_error_code(std::errc::invalid_argument),
+                             "Can't find start pass \"" + Info.StartPass +
+                                 "\".");
   if (!Stopped)
-    return make_error<StringError>(
-        "Can't find stop pass \"" + Info.StopPass + "\".",
-        std::make_error_code(std::errc::invalid_argument));
+    return createStringError(std::make_error_code(std::errc::invalid_argument),
+                             "Can't find stop pass \"" + Info.StopPass + "\".");
   return Error::success();
 }
 

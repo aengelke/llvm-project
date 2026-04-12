@@ -490,8 +490,7 @@ public:
                        raw_pwrite_stream &Out, raw_pwrite_stream *DwoOut,
                        CodeGenFileType FileType, const CGPassBuilderOption &Opt,
                        MCContext &Ctx, PassInstrumentationCallbacks *PIC) {
-    return make_error<StringError>("buildCodeGenPipeline is not overridden",
-                                   inconvertibleErrorCode());
+    return createStringError("buildCodeGenPipeline is not overridden");
   }
 
   /// Returns true if the target is expected to pass all machine verifier

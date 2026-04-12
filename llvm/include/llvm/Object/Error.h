@@ -84,7 +84,7 @@ private:
 LLVM_ABI Error isNotObjectErrorInvalidFileType(llvm::Error Err);
 
 inline Error createError(const Twine &Err) {
-  return make_error<StringError>(Err, object_error::parse_failed);
+  return createStringError(make_error_code(object_error::parse_failed), Err);
 }
 
 } // end namespace object.

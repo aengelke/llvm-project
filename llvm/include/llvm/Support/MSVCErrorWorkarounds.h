@@ -42,8 +42,7 @@ public:
 // std::future implementation, which requires default constructible types.
 template <typename T> class MSVCPExpected : public Expected<T> {
 public:
-  MSVCPExpected()
-      : Expected<T>(make_error<StringError>("", inconvertibleErrorCode())) {
+  MSVCPExpected() : Expected<T>(createStringError("")) {
     consumeError(this->takeError());
   }
 

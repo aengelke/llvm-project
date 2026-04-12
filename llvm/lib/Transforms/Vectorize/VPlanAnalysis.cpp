@@ -18,6 +18,7 @@
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/PatternMatch.h"
+#include "llvm/Support/GenericDomTreeConstruction.h"
 
 using namespace llvm;
 using namespace VPlanPatternMatch;
@@ -371,6 +372,9 @@ void llvm::collectEphemeralRecipesForVPlan(
 
 template void DomTreeBuilder::Calculate<DominatorTreeBase<VPBlockBase, false>>(
     DominatorTreeBase<VPBlockBase, false> &DT);
+
+template void DomTreeBuilder::Calculate<DominatorTreeBase<VPBlockBase, true>>(
+    DominatorTreeBase<VPBlockBase, true> &PDT);
 
 bool VPDominatorTree::properlyDominates(const VPRecipeBase *A,
                                         const VPRecipeBase *B) {

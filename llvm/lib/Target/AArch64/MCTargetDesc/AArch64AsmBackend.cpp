@@ -575,9 +575,6 @@ public:
   /// Generate the compact unwind encoding from the CFI directives.
   void generateCompactUnwindEncoding(MCDwarfFrameInfo &FI,
                                      const MCContext *Ctxt) const override {
-    // Default to DWARF in case of early exit.
-    FI.CompactUnwindEncoding = CU::UNWIND_ARM64_MODE_DWARF;
-
     // MTE-tagged frames must use DWARF unwinding because compact unwind
     // doesn't handle MTE tags
     if (FI.IsMTETaggedFrame)
@@ -589,7 +586,8 @@ public:
 
     ArrayRef<MCCFIInstruction> Instrs = FI.Instructions;
     if (Instrs.empty()) {
-      FI.CompactUnwindEncoding = CU::UNWIND_ARM64_MODE_FRAMELESS;
+      FI.CompactUnwindDescriptors.emplace_back(FI.Begin,
+                                               CU::UNWIND_ARM64_MODE_FRAMELESS);
       return;
     }
     if (!isDarwinCanonicalPersonality(FI.Personality) &&
@@ -739,7 +737,7 @@ public:
       CompactUnwindEncoding |= encodeStackAdjustment(StackSize);
     }
 
-    FI.CompactUnwindEncoding = CompactUnwindEncoding;
+    FI.CompactUnwindDescriptors.emplace_back(FI.Begin, CompactUnwindEncoding);
   }
 };
 

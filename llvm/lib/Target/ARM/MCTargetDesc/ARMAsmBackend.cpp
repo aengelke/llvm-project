@@ -1181,9 +1181,6 @@ void ARMAsmBackendDarwin::generateCompactUnwindEncoding(
     MCDwarfFrameInfo &FI, const MCContext *Ctxt) const {
   DEBUG_WITH_TYPE("compact-unwind", llvm::dbgs() << "generateCU()\n");
 
-  // Default to DWARF in case of early exit.
-  FI.CompactUnwindEncoding = CU::UNWIND_ARM_MODE_DWARF;
-
   // Only armv7k uses CFI based unwinding.
   if (Subtype != MachO::CPU_SUBTYPE_ARM_V7K) {
     FI.CompactUnwindEncoding = 0;
@@ -1336,7 +1333,7 @@ void ARMAsmBackendDarwin::generateCompactUnwindEncoding(
 
   // If no floats saved, we are done.
   if (FloatRegCount == 0) {
-    FI.CompactUnwindEncoding = CompactUnwindEncoding;
+    FI.CompactUnwindDescriptors.emplace_back(FI.Begin, CompactUnwindEncoding);
     return;
   }
 
@@ -1377,7 +1374,8 @@ void ARMAsmBackendDarwin::generateCompactUnwindEncoding(
     CurOffset -= 8;
   }
 
-  FI.CompactUnwindEncoding = CompactUnwindEncoding | ((FloatRegCount - 1) << 8);
+  CompactUnwindEncoding |= ((FloatRegCount - 1) << 8);
+  FI.CompactUnwindDescriptors.emplace_back(FI.Begin, CompactUnwindEncoding);
 }
 
 static MCAsmBackend *createARMAsmBackend(const Target &T,

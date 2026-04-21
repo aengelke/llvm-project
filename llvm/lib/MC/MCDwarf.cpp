@@ -1370,8 +1370,8 @@ public:
   FrameEmitterImpl(bool IsEH, MCObjectStreamer &Streamer)
       : IsEH(IsEH), Streamer(Streamer) {}
 
-  /// Emit the unwind information in a compact way.
-  void EmitCompactUnwind(const MCDwarfFrameInfo &frame);
+  /// Emit the unwind information in a compact way for Mach-O.
+  void EmitCompactUnwind(const MCDwarfFrameInfo &Frame, uint32_t Encoding);
 
   const MCSymbol &EmitCIE(const MCDwarfFrameInfo &F);
   void EmitFDE(const MCSymbol &cieStart, const MCDwarfFrameInfo &frame,
@@ -1578,8 +1578,9 @@ void FrameEmitterImpl::emitCFIInstructions(ArrayRef<MCCFIInstruction> Instrs,
   }
 }
 
-/// Emit the unwind information in a compact way.
-void FrameEmitterImpl::EmitCompactUnwind(const MCDwarfFrameInfo &Frame) {
+/// Emit the unwind information in a compact way for Mach-O.
+void FrameEmitterImpl::EmitCompactUnwind(const MCDwarfFrameInfo &Frame,
+                                         uint32_t Encoding) {
   MCContext &Context = Streamer.getContext();
   const MCObjectFileInfo *MOFI = Context.getObjectFileInfo();
 
@@ -1605,8 +1606,6 @@ void FrameEmitterImpl::EmitCompactUnwind(const MCDwarfFrameInfo &Frame) {
   //   .quad __gxx_personality
   //   .quad except_tab1
 
-  uint32_t Encoding = Frame.CompactUnwindEncoding;
-  if (!Encoding) return;
   bool DwarfEHFrameOnly = (Encoding == MOFI->getCompactUnwindDwarfEHFrameOnly());
 
   // The encoding needs to know we have an LSDA.
@@ -1922,20 +1921,32 @@ void MCDwarfFrameEmitter::emit(MCObjectStreamer &Streamer, bool IsEH) {
 
   // Emit the compact unwind info if available.
   bool NeedsEHFrameSection = !MOFI->getSupportsCompactUnwindWithoutEHFrame();
+  // NB: only Mach-O has a compact unwind section.
   if (IsEH && MOFI->getCompactUnwindSection()) {
     Streamer.generateCompactUnwindEncodings();
     bool SectionEmitted = false;
     for (const MCDwarfFrameInfo &Frame : FrameArray) {
-      if (Frame.CompactUnwindEncoding == 0) continue;
+      uint32_t Encoding;
+      assert(Frame.CompactUnwindDescriptors.size() <= 1 &&
+             "on Darwin, functions should have at most one compact unwind "
+             "descriptor");
+      if (Frame.CompactUnwindDescriptors.empty()) {
+        NeedsEHFrameSection = true;
+        Encoding = MOFI->getCompactUnwindDwarfEHFrameOnly();
+      } else {
+        Encoding = Frame.CompactUnwindDescriptors[0].Desc;
+        assert(Encoding != MOFI->getCompactUnwindDwarfEHFrameOnly() &&
+               "DwarfEHOnly encoding should be expressed through absence");
+      }
+      if (Encoding == 0)
+        continue;
+
       if (!SectionEmitted) {
         Streamer.switchSection(MOFI->getCompactUnwindSection());
         Streamer.emitValueToAlignment(Align(AsmInfo->getCodePointerSize()));
         SectionEmitted = true;
       }
-      NeedsEHFrameSection |=
-        Frame.CompactUnwindEncoding ==
-          MOFI->getCompactUnwindDwarfEHFrameOnly();
-      Emitter.EmitCompactUnwind(Frame);
+      Emitter.EmitCompactUnwind(Frame, Encoding);
     }
   }
 
@@ -1968,8 +1979,7 @@ void MCDwarfFrameEmitter::emit(MCObjectStreamer &Streamer, bool IsEH) {
   for (auto I = FrameArrayX.begin(), E = FrameArrayX.end(); I != E;) {
     const MCDwarfFrameInfo &Frame = *I;
     ++I;
-    if (CanOmitDwarf && Frame.CompactUnwindEncoding !=
-          MOFI->getCompactUnwindDwarfEHFrameOnly() && IsEH)
+    if (CanOmitDwarf && !Frame.CompactUnwindDescriptors.empty() && IsEH)
       // CIEs and FDEs can be emitted in either the eh_frame section or the
       // debug_frame section, on some platforms (e.g. AArch64) the target object
       // file supports emitting a compact_unwind section without an associated

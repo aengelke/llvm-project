@@ -1306,16 +1306,13 @@ public:
   /// for the CFI instructions.
   void generateCompactUnwindEncoding(MCDwarfFrameInfo &FI,
                                      const MCContext *Ctxt) const override {
-    // Default to DWARF in case of early exit.
-    FI.CompactUnwindEncoding = CU::UNWIND_MODE_DWARF;
-
     // Signal frames cannot be encoded in compact unwind.
     if (FI.IsSignalFrame)
       return;
 
     ArrayRef<MCCFIInstruction> Instrs = FI.Instructions;
     if (Instrs.empty()) {
-      FI.CompactUnwindEncoding = 0;
+      FI.CompactUnwindDescriptors.emplace_back(FI.Begin, 0);
       return;
     }
     if (!isDarwinCanonicalPersonality(FI.Personality) &&
@@ -1473,7 +1470,7 @@ public:
         RegEnc & CU::UNWIND_FRAMELESS_STACK_REG_PERMUTATION;
     }
 
-    FI.CompactUnwindEncoding = CompactUnwindEncoding;
+    FI.CompactUnwindDescriptors.emplace_back(FI.Begin, CompactUnwindEncoding);
   }
 };
 

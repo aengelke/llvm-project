@@ -1304,17 +1304,23 @@ public:
 
   /// Implementation of algorithm to generate the compact unwind encoding
   /// for the CFI instructions.
-  uint64_t generateCompactUnwindEncoding(const MCDwarfFrameInfo *FI,
-                                         const MCContext *Ctxt) const override {
-    // Signal frames cannot be encoded in compact unwind.
-    if (FI->IsSignalFrame)
-      return CU::UNWIND_MODE_DWARF;
+  void generateCompactUnwindEncoding(MCDwarfFrameInfo &FI,
+                                     const MCContext *Ctxt) const override {
+    // Default to DWARF in case of early exit.
+    FI.CompactUnwindEncoding = CU::UNWIND_MODE_DWARF;
 
-    ArrayRef<MCCFIInstruction> Instrs = FI->Instructions;
-    if (Instrs.empty()) return 0;
-    if (!isDarwinCanonicalPersonality(FI->Personality) &&
+    // Signal frames cannot be encoded in compact unwind.
+    if (FI.IsSignalFrame)
+      return;
+
+    ArrayRef<MCCFIInstruction> Instrs = FI.Instructions;
+    if (Instrs.empty()) {
+      FI.CompactUnwindEncoding = 0;
+      return;
+    }
+    if (!isDarwinCanonicalPersonality(FI.Personality) &&
         !Ctxt->emitCompactUnwindNonCanonical())
-      return CU::UNWIND_MODE_DWARF;
+      return;
 
     // Reset the saved registers.
     unsigned SavedRegIdx = 0;
@@ -1336,7 +1342,7 @@ public:
       default:
         // Any other CFI directives indicate a frame that we aren't prepared
         // to represent via compact unwind, so just bail out.
-        return CU::UNWIND_MODE_DWARF;
+        return;
       case MCCFIInstruction::OpDefCfaRegister: {
         // Defines a frame pointer. E.g.
         //
@@ -1350,7 +1356,7 @@ public:
         // generate a compact unwinding representation, so bail out.
         if (*MRI.getLLVMRegNum(Inst.getRegister(), true) !=
             (Is64Bit ? X86::RBP : X86::EBP))
-          return CU::UNWIND_MODE_DWARF;
+          return;
 
         // Reset the counts.
         memset(SavedRegs, 0, sizeof(SavedRegs));
@@ -1394,7 +1400,7 @@ public:
         if (SavedRegIdx == CU_NUM_SAVED_REGS)
           // If there are too many saved registers, we cannot use a compact
           // unwind encoding.
-          return CU::UNWIND_MODE_DWARF;
+          return;
 
         MCRegister Reg = *MRI.getLLVMRegNum(Inst.getRegister(), true);
         SavedRegs[SavedRegIdx++] = Reg.id();
@@ -1411,16 +1417,17 @@ public:
     if (HasFP) {
       if ((StackAdjust & 0xFF) != StackAdjust)
         // Offset was too big for a compact unwind encoding.
-        return CU::UNWIND_MODE_DWARF;
+        return;
 
       // We don't attempt to track a real StackAdjust, so if the saved registers
       // aren't adjacent to rbp we can't cope.
       if (SavedRegIdx != 0 && MinAbsOffset != 3 * (int)OffsetSize)
-        return CU::UNWIND_MODE_DWARF;
+        return;
 
       // Get the encoding of the saved registers when we have a frame pointer.
       uint32_t RegEnc = encodeCompactUnwindRegistersWithFrame();
-      if (RegEnc == ~0U) return CU::UNWIND_MODE_DWARF;
+      if (RegEnc == ~0U)
+        return;
 
       CompactUnwindEncoding |= CU::UNWIND_MODE_BP_FRAME;
       CompactUnwindEncoding |= (StackAdjust & 0xFF) << 16;
@@ -1438,7 +1445,7 @@ public:
       } else {
         if ((StackAdjust & 0x7) != StackAdjust)
           // The extra stack adjustments are too big for us to handle.
-          return CU::UNWIND_MODE_DWARF;
+          return;
 
         // Frameless stack with an offset too large for us to encode compactly.
         CompactUnwindEncoding |= CU::UNWIND_MODE_STACK_IND;
@@ -1458,14 +1465,15 @@ public:
       // Get the encoding of the saved registers when we don't have a frame
       // pointer.
       uint32_t RegEnc = encodeCompactUnwindRegistersWithoutFrame(SavedRegIdx);
-      if (RegEnc == ~0U) return CU::UNWIND_MODE_DWARF;
+      if (RegEnc == ~0U)
+        return;
 
       // Encode the register encoding.
       CompactUnwindEncoding |=
         RegEnc & CU::UNWIND_FRAMELESS_STACK_REG_PERMUTATION;
     }
 
-    return CompactUnwindEncoding;
+    FI.CompactUnwindEncoding = CompactUnwindEncoding;
   }
 };
 

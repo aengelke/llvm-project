@@ -195,10 +195,8 @@ public:
   virtual bool finishLayout() const { return false; }
 
   /// Generate the compact unwind encoding for the CFI instructions.
-  virtual uint64_t generateCompactUnwindEncoding(const MCDwarfFrameInfo *FI,
-                                                 const MCContext *Ctxt) const {
-    return 0;
-  }
+  virtual void generateCompactUnwindEncoding(MCDwarfFrameInfo &FI,
+                                             const MCContext *Ctxt) const {}
 
   bool isDarwinCanonicalPersonality(const MCSymbol *Sym) const;
 

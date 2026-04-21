@@ -33,8 +33,8 @@ public:
         /*Is64Bit=*/false, cantFail(MachO::getCPUType(TT)), Subtype);
   }
 
-  uint64_t generateCompactUnwindEncoding(const MCDwarfFrameInfo *FI,
-                                         const MCContext *Ctxt) const override;
+  void generateCompactUnwindEncoding(MCDwarfFrameInfo &FI,
+                                     const MCContext *Ctxt) const override;
 };
 } // end namespace llvm
 

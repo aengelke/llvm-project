@@ -1177,26 +1177,33 @@ enum CompactUnwindEncodings {
 /// instructions. If the CFI instructions describe a frame that cannot be
 /// encoded in compact unwind, the method returns UNWIND_ARM_MODE_DWARF which
 /// tells the runtime to fallback and unwind using dwarf.
-uint64_t ARMAsmBackendDarwin::generateCompactUnwindEncoding(
-    const MCDwarfFrameInfo *FI, const MCContext *Ctxt) const {
+void ARMAsmBackendDarwin::generateCompactUnwindEncoding(
+    MCDwarfFrameInfo &FI, const MCContext *Ctxt) const {
   DEBUG_WITH_TYPE("compact-unwind", llvm::dbgs() << "generateCU()\n");
 
+  // Default to DWARF in case of early exit.
+  FI.CompactUnwindEncoding = CU::UNWIND_ARM_MODE_DWARF;
+
   // Only armv7k uses CFI based unwinding.
-  if (Subtype != MachO::CPU_SUBTYPE_ARM_V7K)
-    return 0;
+  if (Subtype != MachO::CPU_SUBTYPE_ARM_V7K) {
+    FI.CompactUnwindEncoding = 0;
+    return;
+  }
 
   // Signal frames cannot be encoded in compact unwind.
-  if (FI->IsSignalFrame)
-    return CU::UNWIND_ARM_MODE_DWARF;
+  if (FI.IsSignalFrame)
+    return;
 
   // No .cfi directives means no frame.
-  ArrayRef<MCCFIInstruction> Instrs = FI->Instructions;
-  if (Instrs.empty())
-    return 0;
+  ArrayRef<MCCFIInstruction> Instrs = FI.Instructions;
+  if (Instrs.empty()) {
+    FI.CompactUnwindEncoding = 0;
+    return;
+  }
 
-  if (!isDarwinCanonicalPersonality(FI->Personality) &&
+  if (!isDarwinCanonicalPersonality(FI.Personality) &&
       !Ctxt->emitCompactUnwindNonCanonical())
-    return CU::UNWIND_ARM_MODE_DWARF;
+    return;
 
   // Start off assuming CFA is at SP+0.
   MCRegister CFARegister = ARM::SP;
@@ -1242,21 +1249,22 @@ uint64_t ARMAsmBackendDarwin::generateCompactUnwindEncoding(
                           << "CFI directive not compatible with compact "
                              "unwind encoding, opcode="
                           << uint8_t(Inst.getOperation()) << "\n");
-      return CU::UNWIND_ARM_MODE_DWARF;
-      break;
+      return;
     }
   }
 
   // If no frame set up, return no unwind info.
-  if ((CFARegister == ARM::SP) && (CFARegisterOffset == 0))
-    return 0;
+  if ((CFARegister == ARM::SP) && (CFARegisterOffset == 0)) {
+    FI.CompactUnwindEncoding = 0;
+    return;
+  }
 
   // Verify standard frame (lr/r7) was used.
   if (CFARegister != ARM::R7) {
     DEBUG_WITH_TYPE("compact-unwind", llvm::dbgs() << "frame register is "
                                                    << CFARegister.id()
                                                    << " instead of r7\n");
-    return CU::UNWIND_ARM_MODE_DWARF;
+    return;
   }
   int StackAdjust = CFARegisterOffset - 8;
   if (RegOffsets.lookup(ARM::LR) != (-4 - StackAdjust)) {
@@ -1266,12 +1274,12 @@ uint64_t ARMAsmBackendDarwin::generateCompactUnwindEncoding(
                      << StackAdjust
                      << ", CFARegisterOffset=" << CFARegisterOffset
                      << ", lr save at offset=" << RegOffsets[ARM::LR] << "\n");
-    return CU::UNWIND_ARM_MODE_DWARF;
+    return;
   }
   if (RegOffsets.lookup(ARM::R7) != (-8 - StackAdjust)) {
     DEBUG_WITH_TYPE("compact-unwind",
                     llvm::dbgs() << "r7 not saved as standard frame\n");
-    return CU::UNWIND_ARM_MODE_DWARF;
+    return;
   }
   uint32_t CompactUnwindEncoding = CU::UNWIND_ARM_MODE_FRAME;
 
@@ -1292,7 +1300,7 @@ uint64_t ARMAsmBackendDarwin::generateCompactUnwindEncoding(
     DEBUG_WITH_TYPE("compact-unwind", llvm::dbgs()
                                           << ".cfi_def_cfa stack adjust ("
                                           << StackAdjust << ") out of range\n");
-    return CU::UNWIND_ARM_MODE_DWARF;
+    return;
   }
 
   // If r6 is saved, it must be right below r7.
@@ -1320,15 +1328,17 @@ uint64_t ARMAsmBackendDarwin::generateCompactUnwindEncoding(
                       llvm::dbgs() << MRI.getName(CSReg.Reg) << " saved at "
                                    << RegOffset << " but only supported at "
                                    << CurOffset << "\n");
-      return CU::UNWIND_ARM_MODE_DWARF;
+      return;
     }
     CompactUnwindEncoding |= CSReg.Encoding;
     CurOffset -= 4;
   }
 
   // If no floats saved, we are done.
-  if (FloatRegCount == 0)
-    return CompactUnwindEncoding;
+  if (FloatRegCount == 0) {
+    FI.CompactUnwindEncoding = CompactUnwindEncoding;
+    return;
+  }
 
   // Switch mode to include D register saving.
   CompactUnwindEncoding &= ~CU::UNWIND_ARM_MODE_MASK;
@@ -1340,7 +1350,7 @@ uint64_t ARMAsmBackendDarwin::generateCompactUnwindEncoding(
     DEBUG_WITH_TYPE("compact-unwind",
                     llvm::dbgs() << "unsupported number of D registers saved ("
                                  << FloatRegCount << ")\n");
-      return CU::UNWIND_ARM_MODE_DWARF;
+    return;
   }
 
   // Floating point registers must either be saved sequentially, or we defer to
@@ -1354,7 +1364,7 @@ uint64_t ARMAsmBackendDarwin::generateCompactUnwindEncoding(
                       llvm::dbgs() << FloatRegCount << " D-regs saved, but "
                                    << MRI.getName(FPRCSRegs[Idx])
                                    << " not saved\n");
-      return CU::UNWIND_ARM_MODE_DWARF;
+      return;
     } else if (Offset->second != CurOffset - 8) {
       DEBUG_WITH_TYPE("compact-unwind",
                       llvm::dbgs() << FloatRegCount << " D-regs saved, but "
@@ -1362,12 +1372,12 @@ uint64_t ARMAsmBackendDarwin::generateCompactUnwindEncoding(
                                    << " saved at " << Offset->second
                                    << ", expected at " << CurOffset - 8
                                    << "\n");
-      return CU::UNWIND_ARM_MODE_DWARF;
+      return;
     }
     CurOffset -= 8;
   }
 
-  return CompactUnwindEncoding | ((FloatRegCount - 1) << 8);
+  FI.CompactUnwindEncoding = CompactUnwindEncoding | ((FloatRegCount - 1) << 8);
 }
 
 static MCAsmBackend *createARMAsmBackend(const Target &T,

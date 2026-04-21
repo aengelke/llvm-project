@@ -184,8 +184,7 @@ void MCObjectStreamer::reset() {
 void MCObjectStreamer::generateCompactUnwindEncodings() {
   auto &Backend = getAssembler().getBackend();
   for (auto &FI : DwarfFrameInfos)
-    FI.CompactUnwindEncoding =
-        Backend.generateCompactUnwindEncoding(&FI, &getContext());
+    Backend.generateCompactUnwindEncoding(FI, &getContext());
 }
 
 void MCObjectStreamer::emitFrames() {

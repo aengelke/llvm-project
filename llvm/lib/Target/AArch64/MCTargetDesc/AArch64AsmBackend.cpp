@@ -573,23 +573,28 @@ public:
   }
 
   /// Generate the compact unwind encoding from the CFI directives.
-  uint64_t generateCompactUnwindEncoding(const MCDwarfFrameInfo *FI,
-                                         const MCContext *Ctxt) const override {
+  void generateCompactUnwindEncoding(MCDwarfFrameInfo &FI,
+                                     const MCContext *Ctxt) const override {
+    // Default to DWARF in case of early exit.
+    FI.CompactUnwindEncoding = CU::UNWIND_ARM64_MODE_DWARF;
+
     // MTE-tagged frames must use DWARF unwinding because compact unwind
     // doesn't handle MTE tags
-    if (FI->IsMTETaggedFrame)
-      return CU::UNWIND_ARM64_MODE_DWARF;
+    if (FI.IsMTETaggedFrame)
+      return;
 
     // Signal frames cannot be encoded in compact unwind.
-    if (FI->IsSignalFrame)
-      return CU::UNWIND_ARM64_MODE_DWARF;
+    if (FI.IsSignalFrame)
+      return;
 
-    ArrayRef<MCCFIInstruction> Instrs = FI->Instructions;
-    if (Instrs.empty())
-      return CU::UNWIND_ARM64_MODE_FRAMELESS;
-    if (!isDarwinCanonicalPersonality(FI->Personality) &&
+    ArrayRef<MCCFIInstruction> Instrs = FI.Instructions;
+    if (Instrs.empty()) {
+      FI.CompactUnwindEncoding = CU::UNWIND_ARM64_MODE_FRAMELESS;
+      return;
+    }
+    if (!isDarwinCanonicalPersonality(FI.Personality) &&
         !Ctxt->emitCompactUnwindNonCanonical())
-      return CU::UNWIND_ARM64_MODE_DWARF;
+      return;
 
     bool HasFP = false;
     uint64_t StackSize = 0;
@@ -602,7 +607,7 @@ public:
       switch (Inst.getOperation()) {
       default:
         // Cannot handle this directive:  bail out.
-        return CU::UNWIND_ARM64_MODE_DWARF;
+        return;
       case MCCFIInstruction::OpDefCfa: {
         // Defines a frame pointer.
         MCRegister XReg =
@@ -613,20 +618,20 @@ public:
         // FIXME: When opt-remarks are supported in MC, add a remark to notify
         // the user.
         if (XReg != AArch64::FP)
-          return CU::UNWIND_ARM64_MODE_DWARF;
+          return;
 
         if (i + 2 >= e)
-          return CU::UNWIND_ARM64_MODE_DWARF;
+          return;
 
         const MCCFIInstruction &LRPush = Instrs[++i];
         if (LRPush.getOperation() != MCCFIInstruction::OpOffset)
-          return CU::UNWIND_ARM64_MODE_DWARF;
+          return;
         const MCCFIInstruction &FPPush = Instrs[++i];
         if (FPPush.getOperation() != MCCFIInstruction::OpOffset)
-          return CU::UNWIND_ARM64_MODE_DWARF;
+          return;
 
         if (FPPush.getOffset() + 8 != LRPush.getOffset())
-          return CU::UNWIND_ARM64_MODE_DWARF;
+          return;
         CurOffset = FPPush.getOffset();
 
         MCRegister LRReg = *MRI.getLLVMRegNum(LRPush.getRegister(), true);
@@ -636,7 +641,7 @@ public:
         FPReg = getXRegFromWReg(FPReg);
 
         if (LRReg != AArch64::LR || FPReg != AArch64::FP)
-          return CU::UNWIND_ARM64_MODE_DWARF;
+          return;
 
         // Indicate that the function has a frame.
         CompactUnwindEncoding |= CU::UNWIND_ARM64_MODE_FRAME;
@@ -645,7 +650,7 @@ public:
       }
       case MCCFIInstruction::OpDefCfaOffset: {
         if (StackSize != 0)
-          return CU::UNWIND_ARM64_MODE_DWARF;
+          return;
         StackSize = std::abs(Inst.getOffset());
         break;
       }
@@ -654,19 +659,19 @@ public:
         // `.cfi_offset' instructions with the appropriate registers specified.
         MCRegister Reg1 = *MRI.getLLVMRegNum(Inst.getRegister(), true);
         if (i + 1 == e)
-          return CU::UNWIND_ARM64_MODE_DWARF;
+          return;
 
         if (CurOffset != 0 && Inst.getOffset() != CurOffset - 8)
-          return CU::UNWIND_ARM64_MODE_DWARF;
+          return;
         CurOffset = Inst.getOffset();
 
         const MCCFIInstruction &Inst2 = Instrs[++i];
         if (Inst2.getOperation() != MCCFIInstruction::OpOffset)
-          return CU::UNWIND_ARM64_MODE_DWARF;
+          return;
         MCRegister Reg2 = *MRI.getLLVMRegNum(Inst2.getRegister(), true);
 
         if (Inst2.getOffset() != CurOffset - 8)
-          return CU::UNWIND_ARM64_MODE_DWARF;
+          return;
         CurOffset = Inst2.getOffset();
 
         // N.B. The encodings must be in register number order, and the X
@@ -716,7 +721,7 @@ public:
             CompactUnwindEncoding |= CU::UNWIND_ARM64_FRAME_D14_D15_PAIR;
           else
             // A pair was pushed which we cannot handle.
-            return CU::UNWIND_ARM64_MODE_DWARF;
+            return;
         }
 
         break;
@@ -728,13 +733,13 @@ public:
       // With compact unwind info we can only represent stack adjustments of up
       // to 65520 bytes.
       if (StackSize > 65520)
-        return CU::UNWIND_ARM64_MODE_DWARF;
+        return;
 
       CompactUnwindEncoding |= CU::UNWIND_ARM64_MODE_FRAMELESS;
       CompactUnwindEncoding |= encodeStackAdjustment(StackSize);
     }
 
-    return CompactUnwindEncoding;
+    FI.CompactUnwindEncoding = CompactUnwindEncoding;
   }
 };
 

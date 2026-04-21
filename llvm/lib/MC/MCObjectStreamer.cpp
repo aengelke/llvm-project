@@ -182,9 +182,17 @@ void MCObjectStreamer::reset() {
 }
 
 void MCObjectStreamer::generateCompactUnwindEncodings() {
+  const MCObjectFileInfo *MOFI = getContext().getObjectFileInfo();
+  bool ELFCompactUnwind = MOFI->usesELFCompactUnwind();
   auto &Backend = getAssembler().getBackend();
-  for (auto &FI : DwarfFrameInfos)
+  for (auto &FI : DwarfFrameInfos) {
     Backend.generateCompactUnwindEncoding(FI, &getContext());
+    // Only if the frame info can be encoded using compact unwind descriptors,
+    // use set ElfCompactUnwind, which causes the FDE to be written with the
+    // "C" augmentation in the CIE.
+    if (!FI.CompactUnwindDescriptors.empty())
+      FI.IsELFCompactUnwind = ELFCompactUnwind;
+  }
 }
 
 void MCObjectStreamer::emitFrames() {

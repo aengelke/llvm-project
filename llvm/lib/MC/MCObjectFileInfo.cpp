@@ -27,10 +27,16 @@
 #include "llvm/MC/MCSectionXCOFF.h"
 #include "llvm/MC/MCSymbolGOFF.h"
 #include "llvm/MC/SectionKind.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/TargetParser/Triple.h"
 
 using namespace llvm;
 
+static cl::opt<bool> ELFCompactUnwind(
+    "elf-compact-unwind", cl::Hidden,
+    cl::desc("Use the experimental compact unwind information"));
+
+/// Whether to use compact unwind info for MachO.
 static bool useCompactUnwind(const Triple &T) {
   // Only on darwin.
   if (!T.isOSDarwin())
@@ -402,6 +408,9 @@ void MCObjectFileInfo::initELFMCObjectFileInfo(const Triple &T, bool Large) {
   default:
     break;
   }
+
+  if (T.getArch() == Triple::x86_64)
+    UsesELFCompactUnwind = ELFCompactUnwind;
 
   // Solaris requires different flags for .eh_frame to seemingly every other
   // platform.

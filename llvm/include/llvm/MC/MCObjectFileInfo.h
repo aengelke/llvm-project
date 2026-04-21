@@ -30,13 +30,16 @@ class MCSection;
 class LLVM_ABI MCObjectFileInfo {
 protected:
   /// True if the target object file supports emitting a compact unwind section
-  /// without an associated EH frame section.
+  /// without an associated EH frame section. Mach-O only.
   bool SupportsCompactUnwindWithoutEHFrame = false;
 
   /// OmitDwarfIfHaveCompactUnwind - True if the target object file
   /// supports having some functions with compact unwind and other with
-  /// dwarf unwind.
+  /// dwarf unwind. Mach-O only.
   bool OmitDwarfIfHaveCompactUnwind = false;
+
+  /// Whether compact unwind info should be emitted for ELF.
+  bool UsesELFCompactUnwind = false;
 
   /// FDE CFI encoding. Controls the encoding of the begin label in the
   /// .eh_frame section. Unlike the LSDA encoding, personality encoding, and
@@ -45,6 +48,7 @@ protected:
   unsigned FDECFIEncoding = 0;
 
   /// Compact unwind encoding indicating that we should emit only an EH frame.
+  /// Mach-O only.
   unsigned CompactUnwindDwarfEHFrameOnly = 0;
 
   /// SFrame ABI architecture byte.
@@ -262,6 +266,7 @@ public:
   bool getOmitDwarfIfHaveCompactUnwind() const {
     return OmitDwarfIfHaveCompactUnwind;
   }
+  bool usesELFCompactUnwind() const { return UsesELFCompactUnwind; }
 
   unsigned getFDEEncoding() const { return FDECFIEncoding; }
 

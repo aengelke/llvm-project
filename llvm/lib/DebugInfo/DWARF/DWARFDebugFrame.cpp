@@ -33,12 +33,190 @@
 using namespace llvm;
 using namespace dwarf;
 
+static Expected<UnwindTable> createX86_64CompactUnwindTable(const FDE *Fde) {
+  UnwindRow NullRow;
+  NullRow.setAddress(Fde->getInitialLocation());
+  NullRow.getCFAValue() = UnwindLocation::createIsRegisterPlusOffset(7, 8);
+  NullRow.getRegisterLocations().setRegisterLocation(
+      16, UnwindLocation::createAtCFAPlusOffset(-8));
+
+  ArrayRef<FDE::CompactUnwindDescriptor> CUs =
+      Fde->getCompactUnwindDescriptors();
+  UnwindTable::RowContainer Rows;
+  uint64_t Loc = Fde->getInitialLocation();
+
+  if (!CUs.empty() && CUs[0].Skip > 0) {
+    Rows.push_back(NullRow);
+    Loc += CUs[0].Skip;
+  }
+
+  static constexpr uint8_t RegSaveOrder[] = {
+      // X86::RBP, X86::R15, X86::R14, X86::R13, X86::R12, X86::RBX,
+      6, 15, 14, 13, 12, 3,
+  };
+
+  for (const auto *CU = CUs.begin(), *End = CUs.end(); CU != End; ++CU) {
+    uint64_t Len =
+        CU + 1 == End ? Fde->getInitialLocation() + Fde->getAddressRange() - Loc
+                      : CU[1].Skip;
+    unsigned Mode = (CU->Desc >> 29) & 0x7;
+    unsigned PrologueSize = (CU->Desc >> 32) & 0xff;
+    unsigned EpilogueSize = (CU->Desc >> 40) & 0xff;
+    if (Len < PrologueSize + EpilogueSize)
+      return createStringError(errc::invalid_argument,
+                               "CU len smaller than prologue+epilogue");
+    switch (Mode) {
+    case 0: // NULL
+      NullRow.setAddress(Loc);
+      Rows.push_back(NullRow);
+      break;
+    case 1: { // RBP
+      unsigned InnerPrologueSize = (CU->Desc >> 18) & 0xff;
+      uint64_t MovRbpRspLoc = Loc;
+      UnwindRow Row = NullRow;
+      if (PrologueSize > InnerPrologueSize + 3) {
+        Row.setAddress(Loc);
+        Rows.push_back(Row);
+        MovRbpRspLoc = Loc + PrologueSize - InnerPrologueSize - 3;
+      }
+      Row.setAddress(MovRbpRspLoc);
+      Row.getRegisterLocations().setRegisterLocation(
+          6, UnwindLocation::createAtCFAPlusOffset(-16));
+      Row.getCFAValue() = UnwindLocation::createIsRegisterPlusOffset(7, 16);
+      if (PrologueSize > InnerPrologueSize)
+        Rows.push_back(Row);
+      Row.setAddress(Loc + PrologueSize - InnerPrologueSize);
+      Row.getCFAValue() = UnwindLocation::createIsRegisterPlusOffset(6, 16);
+      if (PrologueSize > 0 && PrologueSize >= InnerPrologueSize)
+        Rows.push_back(Row);
+      unsigned SaveOff = 8;
+      for (auto [Idx, Reg] : enumerate(RegSaveOrder)) {
+        if (!(CU->Desc & (1 << Idx)))
+          continue;
+        SaveOff += 8;
+        Row.getRegisterLocations().setRegisterLocation(
+            Reg, UnwindLocation::createAtCFAPlusOffset(-SaveOff));
+      }
+      if (PrologueSize == 0 || PrologueSize < InnerPrologueSize ||
+          SaveOff != 16) {
+        Row.setAddress(Loc + PrologueSize);
+        Rows.push_back(Row);
+      }
+      if (EpilogueSize > 0) {
+        NullRow.setAddress(Loc + Len - EpilogueSize);
+        Rows.push_back(NullRow);
+      }
+      break;
+    }
+    case 2: { // RSP
+      unsigned FrameSize = 8 * ((CU->Desc >> 6) & 0xfffff);
+      unsigned SavedRegs = 0;
+      unsigned NaturalPrologueSize = 0;
+      for (auto [Idx, Reg] : enumerate(RegSaveOrder)) {
+        if (!(CU->Desc & (1 << Idx)))
+          continue;
+        if (SavedRegs > 0)
+          NaturalPrologueSize += Reg < 8 ? 1 : 2;
+        SavedRegs += 1;
+      }
+      unsigned SubRspDelta = FrameSize - 8 * (SavedRegs + 1);
+      unsigned SubRspSize = SubRspDelta == 0    ? 0
+                            : SubRspDelta == 8  ? 1
+                            : SubRspDelta < 128 ? 4
+                                                : 7;
+      NaturalPrologueSize += SubRspSize;
+
+      DEBUG_WITH_TYPE("compact-unwind",
+                      dbgs() << "Loc=" << Loc << " FrameSize=" << FrameSize
+                             << " NPS=" << NaturalPrologueSize
+                             << " PS=" << PrologueSize << " SR=" << SavedRegs
+                             << " SRS=" << SubRspSize << "\n");
+
+      UnwindRow Row = NullRow;
+      Row.setAddress(Loc);
+      if (PrologueSize > NaturalPrologueSize)
+        Rows.push_back(Row);
+      uint64_t PrologueLoc = Loc + PrologueSize - NaturalPrologueSize;
+      unsigned SaveOff = 8;
+      for (auto [Idx, Reg] : enumerate(RegSaveOrder)) {
+        if (!(CU->Desc & (1 << Idx)))
+          continue;
+        if (SaveOff > 8)
+          PrologueLoc += Reg < 8 ? 1 : 2;
+        SaveOff += 8;
+        Row.getCFAValue() =
+            UnwindLocation::createIsRegisterPlusOffset(7, SaveOff);
+        Row.getRegisterLocations().setRegisterLocation(
+            Reg, UnwindLocation::createAtCFAPlusOffset(-SaveOff));
+        Row.setAddress(PrologueLoc);
+        if (int64_t(PrologueLoc) >= int64_t(Loc))
+          Rows.push_back(Row);
+      }
+      if (SubRspSize != 0 || PrologueLoc + SubRspSize != Loc + PrologueSize) {
+        Row.setAddress(Loc + PrologueSize);
+        Row.getCFAValue() =
+            UnwindLocation::createIsRegisterPlusOffset(7, FrameSize);
+        Rows.push_back(Row);
+      }
+      if (EpilogueSize > 0) {
+        uint64_t EpilogueLoc = Loc + Len - EpilogueSize;
+        bool First = true;
+        DEBUG_WITH_TYPE("compact-unwind",
+                        dbgs() << "ELoc=" << EpilogueLoc
+                               << " ES=" << EpilogueSize << " SR=" << SavedRegs
+                               << " SRS=" << SubRspSize << "\n");
+        if (SubRspSize > 0) {
+          Row.getCFAValue() =
+              UnwindLocation::createIsRegisterPlusOffset(7, SaveOff);
+          Row.setAddress(EpilogueLoc);
+          Rows.push_back(Row);
+          First = false;
+        }
+        for (auto [Idx, Reg] : enumerate(reverse(RegSaveOrder))) {
+          if (!(CU->Desc & (1 << (5 - Idx))))
+            continue;
+          if (!First)
+            EpilogueLoc += Reg < 8 ? 1 : 2;
+          First = false;
+          SaveOff -= 8;
+          Row.getCFAValue() =
+              UnwindLocation::createIsRegisterPlusOffset(7, SaveOff);
+          Row.getRegisterLocations().removeRegisterLocation(Reg);
+          Row.setAddress(EpilogueLoc);
+          if (EpilogueLoc >= Loc + Len)
+            break;
+          Rows.push_back(Row);
+        }
+      }
+      break;
+    }
+    default:
+      return createStringError(errc::invalid_argument,
+                               "unsupported compact unwind mode %d", Mode);
+    }
+    Loc += Len;
+  }
+  return UnwindTable(std::move(Rows));
+}
+
 Expected<UnwindTable> llvm::dwarf::createUnwindTable(const FDE *Fde) {
   const CIE *Cie = Fde->getLinkedCIE();
   if (Cie == nullptr)
     return createStringError(errc::invalid_argument,
                              "unable to get CIE for FDE at offset 0x%" PRIx64,
                              Fde->getOffset());
+
+  if (Cie->isCompactUnwind()) {
+    switch (Fde->cfis().triple()) {
+    case Triple::x86_64:
+      return createX86_64CompactUnwindTable(Fde);
+    default:
+      return createStringError(errc::invalid_argument,
+                               "unsupported architecture for compact unwind "
+                               "FDE at offset 0x%" PRIx64,
+                               Fde->getOffset());
+    }
+  }
 
   // Rows will be empty if there are no CFI instructions.
   if (Cie->cfis().empty() && Fde->cfis().empty())

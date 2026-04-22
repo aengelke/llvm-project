@@ -35,6 +35,7 @@ dwarf::CIE createCIE(bool IsDWARF64, uint64_t Offset, uint64_t Length) {
                     /*LSDAPointerEncoding=*/dwarf::DW_EH_PE_omit,
                     /*Personality=*/std::nullopt,
                     /*PersonalityEnc=*/std::nullopt,
+                    /*IsCompactUnwind=*/false,
                     /*Arch=*/Triple::x86_64);
 }
 
@@ -101,6 +102,7 @@ TEST(DWARFDebugFrame, DumpDWARF64FDE) {
                      /*InitialLocation=*/0x5555abcdabcd,
                      /*AddressRange=*/0x111111111111,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
   expectDumpResult(TestFDE, /*IsEH=*/false,
@@ -119,6 +121,7 @@ TEST(DWARFDebugFrame, DumpEH64FDE) {
                      /*InitialLocation=*/0x4444abcdabcd,
                      /*AddressRange=*/0x111111111111,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
   expectDumpResult(TestFDE, /*IsEH=*/true,
@@ -480,6 +483,7 @@ TEST(DWARFDebugFrame, UnwindTableEmptyRows) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -519,6 +523,7 @@ TEST(DWARFDebugFrame, UnwindTableEmptyRows_NOPs) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -545,6 +550,7 @@ TEST(DWARFDebugFrame, UnwindTableErrorNonAscendingFDERows) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -587,6 +593,7 @@ TEST(DWARFDebugFrame, UnwindTableError_DW_CFA_restore_state) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -622,6 +629,7 @@ TEST(DWARFDebugFrame, UnwindTableError_DW_CFA_GNU_window_save) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -658,6 +666,7 @@ TEST(DWARFDebugFrame, UnwindTableError_DW_CFA_def_cfa_offset) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -693,6 +702,7 @@ TEST(DWARFDebugFrame, UnwindTableDefCFAOffsetSFCFAError) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -728,6 +738,7 @@ TEST(DWARFDebugFrame, UnwindTable_DW_CFA_def_cfa_register) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -768,6 +779,7 @@ TEST(DWARFDebugFrame, UnwindTableRowPushingOpcodes) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -856,6 +868,7 @@ TEST(DWARFDebugFrame, UnwindTable_DW_CFA_restore) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -919,6 +932,7 @@ TEST(DWARFDebugFrame, UnwindTable_DW_CFA_restore_extended) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -983,6 +997,7 @@ TEST(DWARFDebugFrame, UnwindTable_DW_CFA_offset) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -1039,6 +1054,7 @@ TEST(DWARFDebugFrame, UnwindTable_DW_CFA_val_offset) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -1090,6 +1106,7 @@ TEST(DWARFDebugFrame, UnwindTable_DW_CFA_nop) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -1136,6 +1153,7 @@ TEST(DWARFDebugFrame, UnwindTable_DW_CFA_remember_state) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -1248,6 +1266,7 @@ TEST(DWARFDebugFrame, UnwindTable_DW_CFA_undefined) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -1293,6 +1312,7 @@ TEST(DWARFDebugFrame, UnwindTable_DW_CFA_same_value) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -1337,6 +1357,7 @@ TEST(DWARFDebugFrame, UnwindTable_DW_CFA_register) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -1383,6 +1404,7 @@ TEST(DWARFDebugFrame, UnwindTable_DW_CFA_expression) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -1435,6 +1457,7 @@ TEST(DWARFDebugFrame, UnwindTable_DW_CFA_val_expression) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -1488,6 +1511,7 @@ TEST(DWARFDebugFrame, UnwindTable_DW_CFA_def_cfa) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 
@@ -1584,6 +1608,7 @@ TEST(DWARFDebugFrame, UnwindTable_DW_CFA_LLVM_def_aspace_cfa) {
                      /*InitialLocation=*/0x1000,
                      /*AddressRange=*/0x1000,
                      /*Cie=*/&TestCIE,
+                     /*CompactUnwind=*/{},
                      /*LSDAAddress=*/std::nullopt,
                      /*Arch=*/Triple::x86_64);
 

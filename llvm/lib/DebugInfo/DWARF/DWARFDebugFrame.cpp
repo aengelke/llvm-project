@@ -132,17 +132,19 @@ void CIE::dump(raw_ostream &OS, DIDumpOptions DumpOpts) const {
     OS << "\n";
   }
   OS << "\n";
-  printCFIProgram(CFIs, OS, DumpOpts, /*IndentLevel=*/1,
-                  /*InitialLocation=*/{});
-  OS << "\n";
+  if (!IsCompactUnwind) {
+    printCFIProgram(CFIs, OS, DumpOpts, /*IndentLevel=*/1,
+                    /*InitialLocation=*/{});
+    OS << "\n";
 
-  if (Expected<UnwindTable> RowsOrErr = createUnwindTable(this))
-    printUnwindTable(*RowsOrErr, OS, DumpOpts, 1);
-  else {
-    DumpOpts.RecoverableErrorHandler(joinErrors(
-        createStringError(errc::invalid_argument,
-                          "decoding the CIE opcodes into rows failed"),
-        RowsOrErr.takeError()));
+    if (Expected<UnwindTable> RowsOrErr = createUnwindTable(this))
+      printUnwindTable(*RowsOrErr, OS, DumpOpts, 1);
+    else {
+      DumpOpts.RecoverableErrorHandler(joinErrors(
+          createStringError(errc::invalid_argument,
+                            "decoding the CIE opcodes into rows failed"),
+          RowsOrErr.takeError()));
+    }
   }
   OS << "\n";
 }
@@ -161,7 +163,17 @@ void FDE::dump(raw_ostream &OS, DIDumpOptions DumpOpts) const {
   OS << "  Format:       " << FormatString(IsDWARF64) << "\n";
   if (LSDAAddress)
     OS << format("  LSDA Address: %016" PRIx64 "\n", *LSDAAddress);
-  printCFIProgram(CFIs, OS, DumpOpts, /*IndentLevel=*/1, InitialLocation);
+  if ((LinkedCIE && LinkedCIE->isCompactUnwind()) ||
+      !CompactUnwindDescriptors.empty()) {
+    uint64_t Loc = InitialLocation;
+    for (const FDE::CompactUnwindDescriptor &CU : CompactUnwindDescriptors) {
+      Loc += CU.Skip;
+      OS << format("  Descriptor: pc=%08" PRIx64 " desc=%016" PRIx64 "\n", Loc,
+                   CU.Desc);
+    }
+  } else {
+    printCFIProgram(CFIs, OS, DumpOpts, /*IndentLevel=*/1, InitialLocation);
+  }
   OS << "\n";
 
   if (Expected<UnwindTable> RowsOrErr = createUnwindTable(this))
@@ -209,7 +221,7 @@ Error DWARFDebugFrame::parse(DWARFDataExtractor Data) {
     if (Length == 0) {
       auto Cie = std::make_unique<CIE>(
           IsDWARF64, StartOffset, 0, 0, SmallString<8>(), 0, 0, 0, 0, 0,
-          SmallString<8>(), 0, 0, std::nullopt, std::nullopt, Arch);
+          SmallString<8>(), 0, 0, std::nullopt, std::nullopt, false, Arch);
       CIEs[StartOffset] = Cie.get();
       Entries.push_back(std::move(Cie));
       break;
@@ -229,6 +241,7 @@ Error DWARFDebugFrame::parse(DWARFDataExtractor Data) {
     if (Err)
       return Err;
 
+    bool IsCompactUnwind = false;
     if (Id == getCIEId(IsDWARF64, IsEH)) {
       uint8_t Version = Data.getU8(&Offset);
       const char *Augmentation = Data.getCStr(&Offset);
@@ -300,6 +313,9 @@ Error DWARFDebugFrame::parse(DWARFDataExtractor Data) {
             // untagged on unwind.
           case 'G':
             break;
+          case 'C':
+            IsCompactUnwind = true;
+            break;
           }
         }
 
@@ -319,15 +335,20 @@ Error DWARFDebugFrame::parse(DWARFDataExtractor Data) {
           AddressSize, SegmentDescriptorSize, CodeAlignmentFactor,
           DataAlignmentFactor, ReturnAddressRegister, AugmentationData,
           FDEPointerEncoding, LSDAPointerEncoding, Personality,
-          PersonalityEncoding, Arch);
+          PersonalityEncoding, IsCompactUnwind, Arch);
       CIEs[StartOffset] = Cie.get();
       Entries.emplace_back(std::move(Cie));
+
+      // There's no CFI program in the CIE for compact unwind descriptors.
+      if (IsCompactUnwind)
+        Offset = EndStructureOffset;
     } else {
       // FDE
       uint64_t CIEPointer = Id;
       uint64_t InitialLocation = 0;
       uint64_t AddressRange = 0;
       std::optional<uint64_t> LSDAAddress;
+      SmallVector<FDE::CompactUnwindDescriptor, 2> CompactUnwindDescriptors;
       CIE *Cie = CIEs[IsEH ? (StartStructureOffset - CIEPointer) : CIEPointer];
 
       if (IsEH) {
@@ -367,19 +388,45 @@ Error DWARFDebugFrame::parse(DWARFDataExtractor Data) {
                                      " failed",
                                      StartOffset);
         }
+
+        IsCompactUnwind = Cie->isCompactUnwind();
+        if (IsCompactUnwind) {
+          while (Offset < EndStructureOffset) {
+            // TODO: for implementation reasons, Skip is currently encoded as
+            // off-by-one (i.e. value 2 implies a 1 byte skip), value 0
+            // indicates the last record. In principle, there is no reason to
+            // ever encode Skip zero, but this would require more engineering
+            // effort on the MC side (separate fragment that on relaxation kills
+            // a preceeding descriptor). For now, use this workaround.
+            uint64_t Skip = Data.getULEB128(&Offset);
+            if (Skip == 0 || Offset + 8 > EndStructureOffset) {
+              // As an optimization, allow a trailing null descriptor to be
+              // omitted in the encoding.
+              if (Skip)
+                CompactUnwindDescriptors.push_back({Skip - 1, 0});
+              Offset = EndStructureOffset;
+              break;
+            }
+            // TODO: use code alignment factor?
+            uint64_t Desc = Data.getU64(&Offset);
+            CompactUnwindDescriptors.push_back({Skip - 1, Desc});
+          }
+        }
       } else {
         InitialLocation = Data.getRelocatedAddress(&Offset);
         AddressRange = Data.getRelocatedAddress(&Offset);
       }
 
-      Entries.emplace_back(new FDE(IsDWARF64, StartOffset, Length, CIEPointer,
-                                   InitialLocation, AddressRange, Cie,
-                                   LSDAAddress, Arch));
+      Entries.emplace_back(new FDE(
+          IsDWARF64, StartOffset, Length, CIEPointer, InitialLocation,
+          AddressRange, Cie, CompactUnwindDescriptors, LSDAAddress, Arch));
     }
 
-    if (Error E =
-            Entries.back()->cfis().parse(Data, &Offset, EndStructureOffset))
-      return E;
+    if (!IsCompactUnwind) {
+      if (Error E =
+              Entries.back()->cfis().parse(Data, &Offset, EndStructureOffset))
+        return E;
+    }
 
     if (Offset != EndStructureOffset)
       return createStringError(

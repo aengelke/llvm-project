@@ -210,6 +210,7 @@ void PrinterContext<ELFT>::printEHFrame(const Elf_Shdr *EHFrameShdr) const {
 
   for (const dwarf::FrameEntry &Entry : EHFrame) {
     std::optional<uint64_t> InitialLocation;
+    bool IsCompactUnwind = false;
     if (const dwarf::CIE *CIE = dyn_cast<dwarf::CIE>(&Entry)) {
       W.startLine() << format("[0x%" PRIx64 "] CIE length=%" PRIu64 "\n",
                               Address + CIE->getOffset(), CIE->getLength());
@@ -220,6 +221,7 @@ void PrinterContext<ELFT>::printEHFrame(const Elf_Shdr *EHFrameShdr) const {
       W.printNumber("code_alignment_factor", CIE->getCodeAlignmentFactor());
       W.printNumber("data_alignment_factor", CIE->getDataAlignmentFactor());
       W.printNumber("return_address_register", CIE->getReturnAddressRegister());
+      IsCompactUnwind = CIE->isCompactUnwind();
     } else {
       const dwarf::FDE *FDE = cast<dwarf::FDE>(&Entry);
       W.startLine() << format("[0x%" PRIx64 "] FDE length=%" PRIu64
@@ -235,16 +237,26 @@ void PrinterContext<ELFT>::printEHFrame(const Elf_Shdr *EHFrameShdr) const {
           "address_range: 0x%" PRIx64 " (end : 0x%" PRIx64 ")\n",
           FDE->getAddressRange(),
           FDE->getInitialLocation() + FDE->getAddressRange());
+
+      if (auto CUs = FDE->getCompactUnwindDescriptors(); !CUs.empty()) {
+        for (const dwarf::FDE::CompactUnwindDescriptor &CU : CUs)
+          W.startLine() << format("unwind_descriptor: +0x%" PRIx64
+                                  " %016" PRIx64 "\n",
+                                  CU.Skip, CU.Desc);
+        IsCompactUnwind = true;
+      }
     }
 
     W.getOStream() << "\n";
-    W.startLine() << "Program:\n";
-    W.indent();
-    auto DumpOpts = DIDumpOptions();
-    DumpOpts.IsEH = true;
-    printCFIProgram(Entry.cfis(), W.getOStream(), DumpOpts, W.getIndentLevel(),
-                    InitialLocation);
-    W.unindent();
+    if (!IsCompactUnwind) {
+      W.startLine() << "Program:\n";
+      W.indent();
+      auto DumpOpts = DIDumpOptions();
+      DumpOpts.IsEH = true;
+      printCFIProgram(Entry.cfis(), W.getOStream(), DumpOpts,
+                      W.getIndentLevel(), InitialLocation);
+      W.unindent();
+    }
     W.unindent();
     W.getOStream() << "\n";
   }

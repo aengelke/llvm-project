@@ -43,6 +43,8 @@ struct PhdrEntry;
 class SymbolTableBaseSection;
 
 struct CieRecord {
+  bool isCompact = false;
+  unsigned personality = 0;
   EhSectionPiece *cie = nullptr;
   SmallVector<EhSectionPiece *, 0> fdes;
 };
@@ -62,6 +64,13 @@ public:
 
   SmallVector<EhInputSection *, 0> sections;
   size_t numFdes = 0;
+
+  /// Whether there are CIEs with compact unwind information. If set, the
+  /// eh_frame_hdr section must be emitted as v2.
+  bool hasCompactUnwind = false;
+  /// v2: Map from personality function symbol to the personality function
+  /// index. Stored in index order; index 0 is unassigned.
+  llvm::SmallMapVector<const Symbol *, unsigned, 8> personalityMap;
 
   struct FdeData {
     int64_t pcRel;
@@ -109,6 +118,34 @@ public:
   SmallVector<EhFrameSection::FdeData, 0> fdes;
   bool large = false; // Whether to use sdata8 encoding.
   size_t size = 0;
+
+  /// v2: Global descriptors.
+  llvm::SmallVector<uint64_t, 0> cuGlobalDescriptors;
+  struct CompactUnwindPage {
+    int64_t pcRel;         ///< Relative address of first instruction.
+    uint32_t pageOff;      ///< Offset of the page.
+    size_t firstLSDAEntry; ///< Index of first LSDA entry.
+    llvm::SmallVector<uint32_t, 0> entries;
+    llvm::SmallVector<uint64_t, 0> localDescriptors;
+
+    size_t size() const {
+      // Page header is 4 bytes.
+      return 4 + sizeof(uint32_t) * entries.size() +
+             sizeof(uint64_t) * localDescriptors.size();
+    }
+  };
+  /// v2: Second-level pages.
+  llvm::SmallVector<CompactUnwindPage, 0> cuPages;
+  struct CompactUnwindLSDAEntry {
+    int64_t pcRel;
+    int64_t lsdaRel;
+  };
+  /// v2: Highest VA for sentinel page entry.
+  int64_t lastVARel;
+  /// v2: Start offset of LSDA entries.
+  uint32_t cuLSDAOff;
+  /// v2: LSDA entries. Functions have an entry iff they have a personality fn.
+  llvm::SmallVector<CompactUnwindLSDAEntry, 0> cuLSDAEntries;
 };
 
 class GotSection final : public SyntheticSection {

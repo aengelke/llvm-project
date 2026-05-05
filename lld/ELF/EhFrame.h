@@ -10,12 +10,23 @@
 #define LLD_ELF_EHFRAME_H
 
 #include "lld/Common/LLVM.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace lld::elf {
 struct EhSectionPiece;
 
 uint8_t getFdeEncoding(EhSectionPiece *p);
 bool hasLSDA(const EhSectionPiece &p);
+bool isCompactUnwind(const EhSectionPiece &p);
+
+struct CompactUnwindDescriptor {
+  uint64_t off;
+  uint64_t desc;
+};
+// Returns address range.
+uint64_t readCompactUnwindDescriptors(
+    const EhSectionPiece &fde, uint8_t fdeEnc, bool isCompactUnwind,
+    llvm::SmallVectorImpl<CompactUnwindDescriptor> &descs);
 }
 
 #endif

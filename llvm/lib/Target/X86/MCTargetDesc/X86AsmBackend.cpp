@@ -1557,14 +1557,17 @@ bool ELFX86AsmBackend::generateCompactUnwindEncodingImpl(
     case MCCFIInstruction::OpOffset: {
       // Slot 0 = CFA-16, Slot 1 = CFA-24, etc.
       uint32_t Slot = uint32_t(-Inst.getOffset()) / 8 - 2;
+      MCRegister Reg = *MRI.getLLVMRegNum(Inst.getRegister(), true);
       if (Slot >= CU_NUM_SAVED_REGS || Inst.getRegister() >= 16 ||
-          CurState.Regs[Slot].isValid()) {
+          (CurState.Regs[Slot].isValid() && CurState.Regs[Slot] != Reg)) {
         dbgs() << "FAIL: unhandled offset " << Slot << " " << Inst.getRegister()
                << "\n";
         return false;
       }
-      CurState.NumRegs++;
-      CurState.Regs[Slot] = *MRI.getLLVMRegNum(Inst.getRegister(), true);
+      if (CurState.Regs[Slot] != Reg) {
+        CurState.NumRegs++;
+        CurState.Regs[Slot] = Reg;
+      }
       break;
     }
     }

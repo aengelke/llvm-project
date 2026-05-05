@@ -22,6 +22,7 @@
 #include "Relocations.h"
 #include "Target.h"
 #include "llvm/BinaryFormat/Dwarf.h"
+#include "llvm/Support/LEB128.h"
 
 using namespace llvm;
 using namespace llvm::ELF;
@@ -36,6 +37,10 @@ public:
   EhReader(InputSectionBase *s, ArrayRef<uint8_t> d) : isec(s), d(d) {}
   uint8_t getFdeEncoding();
   bool hasLSDA();
+  bool isCompactUnwind();
+  uint64_t readCompactUnwindDescriptors(
+      uint8_t fdeEnc, bool isCompactUnwind,
+      llvm::SmallVectorImpl<CompactUnwindDescriptor> &descs);
 
 private:
   template <class P> void errOn(const P *loc, const Twine &msg) {
@@ -48,6 +53,7 @@ private:
   void skipBytes(size_t count);
   StringRef readString();
   void skipLeb128();
+  uint64_t readULeb128();
   void skipAugP();
   StringRef getAugmentation();
 
@@ -73,7 +79,6 @@ void EhReader::skipBytes(size_t count) {
   else
     d = d.slice(count);
 }
-
 // Read a null-terminated string.
 StringRef EhReader::readString() {
   const uint8_t *end = llvm::find(d, '\0');
@@ -99,6 +104,17 @@ void EhReader::skipLeb128() {
       return;
   }
   errOn(errPos, "corrupted CIE (failed to read LEB128)");
+}
+
+uint64_t EhReader::readULeb128() {
+  const char *err = nullptr;
+  const uint8_t *p = d.data();
+  uint64_t ret = decodeULEB128AndInc(p, d.end(), &err);
+  if (err)
+    errOn(p, "corrupted .eh_frame (failed to read LEB128)");
+  else
+    d = d.slice(p - d.data());
+  return ret;
 }
 
 static size_t getAugPSize(Ctx &ctx, unsigned enc) {
@@ -177,7 +193,7 @@ uint8_t EhReader::getFdeEncoding() {
       readByte();
     else if (c == 'P')
       skipAugP();
-    else if (c != 'B' && c != 'S' && c != 'G') {
+    else if (c != 'B' && c != 'S' && c != 'G' && c != 'C') {
       errOn(aug.data(), "unknown .eh_frame augmentation string: " + aug);
       break;
     }
@@ -196,10 +212,63 @@ bool EhReader::hasLSDA() {
       skipAugP();
     else if (c == 'R')
       readByte();
-    else if (c != 'B' && c != 'S' && c != 'G') {
+    else if (c != 'B' && c != 'S' && c != 'G' && c != 'C') {
       errOn(aug.data(), "unknown .eh_frame augmentation string: " + aug);
       break;
     }
   }
   return false;
+}
+
+bool EhReader::isCompactUnwind() { return getAugmentation().contains('C'); }
+
+bool elf::isCompactUnwind(const EhSectionPiece &p) {
+  return EhReader(p.sec, p.data()).isCompactUnwind();
+}
+
+uint64_t EhReader::readCompactUnwindDescriptors(
+    uint8_t fdeEnc, bool isCompactUnwind,
+    llvm::SmallVectorImpl<CompactUnwindDescriptor> &descs) {
+  Ctx &ctx = isec->file->ctx;
+  // Skip length, cie_pointer, initial_location.
+  unsigned augPSize = getAugPSize(ctx, fdeEnc);
+  skipBytes(8 + augPSize);
+  // Read address_range.
+  uint64_t addressRange = 0;
+  if (augPSize == 4)
+    addressRange = read32(ctx, d.data());
+  else if (augPSize == 8)
+    addressRange = read64(ctx, d.data());
+  else
+    assert(0 && "wait, what?");
+  if (!isCompactUnwind)
+    return addressRange;
+
+  skipBytes(augPSize);
+  // Skip augmentation length and data.
+  uint64_t augLen = readULeb128();
+  skipBytes(augLen);
+
+  uint64_t off = 0;
+  while (!d.empty()) {
+    uint64_t skip = readULeb128();
+    if (skip == 0)
+      break;
+    off += skip - 1;
+    if (d.size() < 8) {
+      descs.push_back({off, 0});
+      break;
+    }
+    uint64_t desc = read64(ctx, d.data());
+    skipBytes(8);
+    descs.push_back({off, desc});
+  }
+  return addressRange;
+}
+
+uint64_t elf::readCompactUnwindDescriptors(
+    const EhSectionPiece &fde, uint8_t fdeEnc, bool isCompactUnwind,
+    llvm::SmallVectorImpl<CompactUnwindDescriptor> &descs) {
+  return EhReader(fde.sec, fde.data())
+      .readCompactUnwindDescriptors(fdeEnc, isCompactUnwind, descs);
 }

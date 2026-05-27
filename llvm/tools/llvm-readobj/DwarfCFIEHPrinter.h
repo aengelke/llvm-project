@@ -181,7 +181,8 @@ createX86_64CompactUnwindTable(ArrayRef<std::pair<uint64_t, uint64_t>> Descs) {
                             : SubRspDelta == 8  ? 1
                             : SubRspDelta < 128 ? 4
                                                 : 7;
-      NaturalPrologueSize += SubRspSize;
+      if (SavedRegs > 0)
+        NaturalPrologueSize += SubRspSize;
 
       DEBUG_WITH_TYPE("compact-unwind",
                       dbgs() << "Loc=" << Loc << " FrameSize=" << FrameSize

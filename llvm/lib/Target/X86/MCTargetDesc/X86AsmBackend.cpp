@@ -1293,6 +1293,9 @@ bool ELFX86AsmBackend::generateCompactUnwindEncodingImpl(
     modeNull:
       if (CurState.isEmptyFrame())
         return true; // Do nothing, remain in NULL descriptor.
+      if (Cur->getFragment() != DescStart->getFragment())
+        break;
+      uint64_t OffDelta = Cur->getOffset() - DescStart->getOffset();
       assert(LastState.CFAOff == 1 && !LastState.IsRBP);
       assert(PrologueSize == 0);
       if (CurState.CFAOff == 2 && !CurState.IsRBP &&
@@ -1300,7 +1303,7 @@ bool ELFX86AsmBackend::generateCompactUnwindEncodingImpl(
         // Stack frame after first push.
         TState = ModeRSPSinglePush;
         DescState = CurState;
-        PrologueSize += LastAdvance;
+        PrologueSize = OffDelta;
         return true;
       }
       if (!CurState.IsRBP && CurState.NumRegs == 0 &&
@@ -1308,7 +1311,7 @@ bool ELFX86AsmBackend::generateCompactUnwindEncodingImpl(
           CanFoldPE(PrologueSize, LastAdvance)) {
         TState = ModeRSPBody;
         DescState = CurState;
-        PrologueSize += LastAdvance;
+        PrologueSize = OffDelta;
         return true;
       }
       break;
@@ -1391,18 +1394,16 @@ bool ELFX86AsmBackend::generateCompactUnwindEncodingImpl(
           CurState.CFAOff + 1 == LastState.CFAOff &&
           CanFoldPE(EpilogueSize, LastAdvance)) {
         // Another pop.
-        if (LastAdvance != PushInstrSize(LastState.Regs[CurState.CFAOff - 1])) {
-          LastState.print(MRI, dbgs());
-          dbgs() << "advance epilogue for off size mismatch: " << LastAdvance
-                 << " != " << PushInstrSize(LastState.Regs[CurState.CFAOff - 1])
-                 << " " << CurState.Regs[CurState.CFAOff - 1] << " "
-                 << (CurState.CFAOff - 1) << "\n";
-          break;
+        if (LastAdvance == PushInstrSize(LastState.Regs[CurState.CFAOff - 1])) {
+          EpilogueSize += LastAdvance;
+          return true;
         }
-        EpilogueSize += LastAdvance;
-        return true;
-      }
-      if (LastState.isEmptyFrame()) {
+        LastState.print(MRI, dbgs());
+        dbgs() << "advance epilogue for off size mismatch: " << LastAdvance
+               << " != " << PushInstrSize(LastState.Regs[CurState.CFAOff - 1])
+               << " " << CurState.Regs[CurState.CFAOff - 1] << " "
+               << (CurState.CFAOff - 1) << "\n";
+      } else if (LastState.isEmptyFrame()) {
         if (CanFoldPE(EpilogueSize, LastAdvance)) {
           EpilogueSize += LastAdvance;
           if (CurState.isEmptyFrame())

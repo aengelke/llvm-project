@@ -116,8 +116,10 @@ private:
 void DefaultInlineAdvice::recordUnsuccessfulInliningImpl(
     const InlineResult &Result) {
   using namespace ore;
-  llvm::setInlineRemark(*OriginalCB, std::string(Result.getFailureReason()) +
-                                         "; " + inlineCostStr(*OIC));
+  // inlineCostStr is not cheap, so only compute if actually needed.
+  if (InlineRemarkAttribute)
+    llvm::setInlineRemark(*OriginalCB, std::string(Result.getFailureReason()) +
+                                           "; " + inlineCostStr(*OIC));
   ORE.emit([&]() {
     return OptimizationRemarkMissed(Advisor->getAnnotatedInlinePassName(),
                                     "NotInlined", DLoc, Block)
@@ -443,7 +445,9 @@ llvm::shouldInline(CallBase &CB, TargetTransformInfo &CalleeTTI,
                << IC;
       });
     }
-    setInlineRemark(CB, inlineCostStr(IC));
+    // inlineCostStr is not cheap, so only compute if actually needed.
+    if (InlineRemarkAttribute)
+      setInlineRemark(CB, inlineCostStr(IC));
     return std::nullopt;
   }
 

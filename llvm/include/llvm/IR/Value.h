@@ -73,8 +73,8 @@ using ValueName = StringMapEntry<Value *>;
 /// objects that watch it and listen to RAUW and Destroy events.  See
 /// llvm/IR/ValueHandle.h for details.
 class Value {
-  const unsigned char SubclassID;   // Subclass identifier (for isa/dyn_cast)
-  unsigned char HasValueHandle : 1; // Has a ValueHandle pointing to this?
+  const unsigned SubclassID : 8;   // Subclass identifier (for isa/dyn_cast)
+  unsigned HasValueHandle : 1; // Has a ValueHandle pointing to this?
 
 protected:
   /// Hold arbitary subclass data.
@@ -82,7 +82,7 @@ protected:
   /// This member is similar to SubclassData, however it is often used for
   /// holding information which may be used to aid optimization, but which may
   /// be cleared to zero without affecting conservative interpretation.
-  unsigned char SubclassOptionalData : 7;
+  unsigned SubclassOptionalData : 7;
 
 private:
   /// Hold arbitrary subclass data.
@@ -90,7 +90,7 @@ private:
   /// This member is defined by this class, but is not used for anything.
   /// Subclasses can use it to hold whatever state they find useful.  This
   /// field is initialized to zero by the ctor.
-  unsigned short SubclassData;
+  unsigned SubclassData : 16;
 
 protected:
   /// The number of operands in the subclass.

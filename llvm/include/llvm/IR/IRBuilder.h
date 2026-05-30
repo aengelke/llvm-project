@@ -272,7 +272,7 @@ public:
     for (unsigned K : MetadataKinds) {
       if (K == LLVMContext::MD_dbg)
         SetCurrentDebugLocation(Src->getDebugLoc());
-      else
+      else if (Src->hasMetadataOtherThanDebugLoc())
         MetadataToCopy.emplace_back(K, Src);
     }
   }

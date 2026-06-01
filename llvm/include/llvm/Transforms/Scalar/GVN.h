@@ -396,7 +396,7 @@ private:
   /// AvailableLoads (connected by Phis if needed).
   void eliminatePartiallyRedundantLoad(
       LoadInst *Load, AvailValInBlkVect &ValuesPerBlock,
-      MapVector<BasicBlock *, Value *> &AvailableLoads,
+      ArrayRef<std::pair<BasicBlock *, Value *>> AvailableLoads,
       MapVector<BasicBlock *, LoadInst *> *CriticalEdgePredAndLoad);
 
   // Other helper routines.

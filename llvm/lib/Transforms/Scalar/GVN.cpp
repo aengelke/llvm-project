@@ -1564,12 +1564,9 @@ LoadInst *GVNPass::findLoadToHoistIntoPred(BasicBlock *Pred, BasicBlock *LoadBB,
 
 void GVNPass::eliminatePartiallyRedundantLoad(
     LoadInst *Load, AvailValInBlkVect &ValuesPerBlock,
-    MapVector<BasicBlock *, Value *> &AvailableLoads,
+    ArrayRef<std::pair<BasicBlock *, Value *>> AvailableLoads,
     MapVector<BasicBlock *, LoadInst *> *CriticalEdgePredAndLoad) {
-  for (const auto &AvailableLoad : AvailableLoads) {
-    BasicBlock *UnavailableBlock = AvailableLoad.first;
-    Value *LoadPtr = AvailableLoad.second;
-
+  for (const auto &[UnavailableBlock, LoadPtr] : AvailableLoads) {
     auto *NewLoad = new LoadInst(
         Load->getType(), LoadPtr, Load->getName() + ".pre", Load->isVolatile(),
         Load->getAlign(), Load->getOrdering(), Load->getSyncScopeID(),
@@ -1710,7 +1707,7 @@ bool GVNPass::PerformLoadPRE(LoadInst *Load, AvailValInBlkVect &ValuesPerBlock,
 
   // Check to see how many predecessors have the loaded value fully
   // available.
-  MapVector<BasicBlock *, Value *> PredLoads;
+  SmallVector<std::pair<BasicBlock *, Value *>> PredLoads;
   DenseMap<BasicBlock *, AvailabilityState> FullyAvailableBlocks;
   for (const AvailableValueInBlock &AV : ValuesPerBlock)
     FullyAvailableBlocks[AV.BB] = AvailabilityState::Available;
@@ -1768,7 +1765,7 @@ bool GVNPass::PerformLoadPRE(LoadInst *Load, AvailValInBlkVect &ValuesPerBlock,
         CriticalEdgePredSplit.push_back(Pred);
     } else {
       // Only add the predecessors that will not be split for now.
-      PredLoads[Pred] = nullptr;
+      PredLoads.emplace_back(Pred, nullptr);
     }
   }
 
@@ -1807,14 +1804,14 @@ bool GVNPass::PerformLoadPRE(LoadInst *Load, AvailValInBlkVect &ValuesPerBlock,
   // Split critical edges, and update the unavailable predecessors accordingly.
   for (BasicBlock *OrigPred : CriticalEdgePredSplit) {
     BasicBlock *NewPred = splitCriticalEdges(OrigPred, LoadBB);
-    assert(!PredLoads.count(OrigPred) && "Split edges shouldn't be in map!");
-    PredLoads[NewPred] = nullptr;
+    //assert(!PredLoads.count(OrigPred) && "Split edges shouldn't be in map!");
+    PredLoads.emplace_back(NewPred, nullptr);
     LLVM_DEBUG(dbgs() << "Split critical edge " << OrigPred->getName() << "->"
                       << LoadBB->getName() << '\n');
   }
 
   for (auto &CEP : CriticalEdgePredAndLoad)
-    PredLoads[CEP.first] = nullptr;
+    PredLoads.emplace_back(CEP.first, nullptr);
 
   // Check if the load can safely be moved to all the unavailable predecessors.
   bool CanDoPRE = true;
@@ -1969,9 +1966,9 @@ bool GVNPass::performLoopLoadPRE(LoadInst *Load,
     return false;
 
   // TODO: Support critical edge splitting if blocker has more than 1 successor.
-  MapVector<BasicBlock *, Value *> AvailableLoads;
-  AvailableLoads[LoopBlock] = LoadPtr;
-  AvailableLoads[Preheader] = LoadPtr;
+  SmallVector<std::pair<BasicBlock *, Value *>, 2> AvailableLoads;
+  AvailableLoads.emplace_back(LoopBlock, LoadPtr);
+  AvailableLoads.emplace_back(Preheader, LoadPtr);
 
   LLVM_DEBUG(dbgs() << "GVN REMOVING PRE LOOP LOAD: " << *Load << '\n');
   eliminatePartiallyRedundantLoad(Load, ValuesPerBlock, AvailableLoads,

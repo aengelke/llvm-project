@@ -48,8 +48,8 @@ class I<dag OOps, dag IOps, list<dag> Pat>
 // CHECK-NEXT:    typedef ComplexRendererFns(MyTargetInstructionSelector::*ComplexMatcherMemFn)(MachineOperand &) const;
 // CHECK-NEXT:    typedef void(MyTargetInstructionSelector::*CustomRendererFn)(MachineInstrBuilder &, const MachineInstr &, int) const;
 // CHECK-NEXT:    const ExecInfoTy<PredicateBitset, ComplexMatcherMemFn, CustomRendererFn> ExecInfo;
-// CHECK-NEXT:    static MyTargetInstructionSelector::ComplexMatcherMemFn ComplexPredicateFns[];
-// CHECK-NEXT:    static MyTargetInstructionSelector::CustomRendererFn CustomRenderers[];
+// CHECK-NEXT:    static const MyTargetInstructionSelector::ComplexMatcherMemFn ComplexPredicateFns[];
+// CHECK-NEXT:    static const MyTargetInstructionSelector::CustomRendererFn CustomRenderers[];
 // CHECK-NEXT:    bool testImmPredicate_I64(unsigned PredicateID, int64_t Imm) const override;
 // CHECK-NEXT:    bool testImmPredicate_APInt(unsigned PredicateID, const APInt &Imm) const override;
 // CHECK-NEXT:    bool testImmPredicate_APFloat(unsigned PredicateID, const APFloat &Imm) const override;

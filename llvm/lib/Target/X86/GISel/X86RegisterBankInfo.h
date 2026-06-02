@@ -29,8 +29,8 @@ protected:
 #define GET_TARGET_REGBANK_INFO_CLASS
 #include "X86GenRegisterBankInfo.def"
 
-  static RegisterBankInfo::PartialMapping PartMappings[];
-  static RegisterBankInfo::ValueMapping ValMappings[];
+  static const RegisterBankInfo::PartialMapping PartMappings[];
+  static const RegisterBankInfo::ValueMapping ValMappings[];
 
   static PartialMappingIdx getPartialMappingIdx(const MachineInstr &MI,
                                                 const LLT &Ty, bool isFP);

@@ -124,7 +124,7 @@ void GlobalISelMatchTableExecutorEmitter::emitComplexPredicates(
   OS << "};\n"
      << "// See constructor for table contents\n\n";
 
-  OS << getClassName() << "::ComplexMatcherMemFn\n"
+  OS << "const " << getClassName() << "::ComplexMatcherMemFn\n"
      << getClassName() << "::ComplexPredicateFns[] = {\n"
      << "  nullptr, // GICP_Invalid\n";
   for (const auto &Record : ComplexOperandMatchers)
@@ -143,7 +143,7 @@ void GlobalISelMatchTableExecutorEmitter::emitCustomOperandRenderers(
     OS << "  GICR_" << Fn << ",\n";
   OS << "};\n";
 
-  OS << getClassName() << "::CustomRendererFn\n"
+  OS << "const " << getClassName() << "::CustomRendererFn\n"
      << getClassName() << "::CustomRenderers[] = {\n"
      << "  nullptr, // GICR_Invalid\n";
   for (const auto &Fn : CustomOperandRenderers)
@@ -229,9 +229,9 @@ void GlobalISelMatchTableExecutorEmitter::emitTemporariesDecl(
      << "  const ExecInfoTy<PredicateBitset, ComplexMatcherMemFn, "
         "CustomRendererFn> "
         "ExecInfo;\n"
-     << "  static " << getClassName()
+     << "  static const " << getClassName()
      << "::ComplexMatcherMemFn ComplexPredicateFns[];\n"
-     << "  static " << getClassName()
+     << "  static const " << getClassName()
      << "::CustomRendererFn CustomRenderers[];\n"
      << "  bool testImmPredicate_I64(unsigned PredicateID, int64_t Imm) const "
         "override;\n"

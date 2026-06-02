@@ -78,8 +78,8 @@ def HasC : Predicate<"Subtarget->hasC()"> { let RecomputePerFunction = 1; }
 // CHECK-NEXT:    typedef ComplexRendererFns(MyTargetInstructionSelector::*ComplexMatcherMemFn)(MachineOperand &) const;
 // CHECK-NEXT:    typedef void(MyTargetInstructionSelector::*CustomRendererFn)(MachineInstrBuilder &, const MachineInstr &, int) const;
 // CHECK-NEXT:    const ExecInfoTy<PredicateBitset, ComplexMatcherMemFn, CustomRendererFn> ExecInfo;
-// CHECK-NEXT:    static MyTargetInstructionSelector::ComplexMatcherMemFn ComplexPredicateFns[];
-// CHECK-NEXT:    static MyTargetInstructionSelector::CustomRendererFn CustomRenderers[];
+// CHECK-NEXT:    static const MyTargetInstructionSelector::ComplexMatcherMemFn ComplexPredicateFns[];
+// CHECK-NEXT:    static const MyTargetInstructionSelector::CustomRendererFn CustomRenderers[];
 // CHECK-NEXT:    bool testImmPredicate_I64(unsigned PredicateID, int64_t Imm) const override;
 // CHECK-NEXT:    bool testImmPredicate_APInt(unsigned PredicateID, const APInt &Imm) const override;
 // CHECK-NEXT:    bool testImmPredicate_APFloat(unsigned PredicateID, const APFloat &Imm) const override;
@@ -165,7 +165,7 @@ def HasC : Predicate<"Subtarget->hasC()"> { let RecomputePerFunction = 1; }
 // CHECK-NEXT:    GICP_gi_complex_rr,
 // CHECK-NEXT:  };
 
-// CHECK-LABEL: MyTargetInstructionSelector::ComplexMatcherMemFn
+// CHECK-LABEL: const MyTargetInstructionSelector::ComplexMatcherMemFn
 // CHECK-NEXT:  MyTargetInstructionSelector::ComplexPredicateFns[] = {
 // CHECK-NEXT:    nullptr, // GICP_Invalid
 // CHECK-NEXT:    &MyTargetInstructionSelector::selectComplexPattern, // gi_complex
@@ -251,7 +251,7 @@ def HasC : Predicate<"Subtarget->hasC()"> { let RecomputePerFunction = 1; }
 // CHECK-NEXT:   GICR_Invalid,
 // CHECK-NEXT:   GICR_renderImm,
 // CHECK-NEXT: };
-// CHECK-NEXT: MyTargetInstructionSelector::CustomRendererFn
+// CHECK-NEXT: const MyTargetInstructionSelector::CustomRendererFn
 // CHECK-NEXT: MyTargetInstructionSelector::CustomRenderers[] = {
 // CHECK-NEXT:   nullptr, // GICR_Invalid
 // CHECK-NEXT:   &MyTargetInstructionSelector::renderImm,

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #ifdef GET_TARGET_REGBANK_INFO_IMPL
-RegisterBankInfo::PartialMapping X86GenRegisterBankInfo::PartMappings[]{
+const RegisterBankInfo::PartialMapping X86GenRegisterBankInfo::PartMappings[]{
     /* StartIdx, Length, RegBank */
     // GPR value
     {0, 8, X86::GPRRegBank},   // :0
@@ -55,7 +55,7 @@ enum PartialMappingIdx {
 #define BREAKDOWN(INDEX, NUM)                                                  \
   { &X86GenRegisterBankInfo::PartMappings[INDEX], NUM }
 // ValueMappings.
-RegisterBankInfo::ValueMapping X86GenRegisterBankInfo::ValMappings[]{
+const RegisterBankInfo::ValueMapping X86GenRegisterBankInfo::ValMappings[]{
     /* BreakDown, NumBreakDowns */
     // 3-operands instructions (all binary operations should end up with one of
     // those mapping).

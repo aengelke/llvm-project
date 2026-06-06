@@ -107,6 +107,14 @@ struct EnumStringsStorage {
       }
     };
   }
+
+  constexpr size_t size() const { return N; }
+  const EnumString<T, NumStrs> &operator[](size_t Idx) const {
+    assert(Idx < N);
+    return Data[Idx];
+  }
+  const EnumString<T, NumStrs> *begin() const { return std::begin(Data); }
+  const EnumString<T, NumStrs> *end() const { return std::end(Data); }
 };
 
 #define BUILD_ENUM_STRINGS(Tab)                                                \

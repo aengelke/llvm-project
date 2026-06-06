@@ -29,11 +29,11 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ELFAttributeParser.h"
 #include "llvm/Support/ELFAttributes.h"
+#include "llvm/Support/Enum.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/LEB128.h"
 #include "llvm/Support/MemoryBufferRef.h"
-#include "llvm/Support/ScopedPrinter.h"
 #include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/TargetParser/Triple.h"
 #include <cassert>
@@ -45,9 +45,7 @@ template <typename T> class SmallVectorImpl;
 
 namespace object {
 
-constexpr int NumElfSymbolTypes = 16;
-LLVM_ABI extern const llvm::EnumEntry<unsigned>
-    ElfSymbolTypes[NumElfSymbolTypes];
+EnumStrings<uint8_t, 2> getElfSymbolTypes();
 
 class elf_symbol_iterator;
 
@@ -197,13 +195,7 @@ public:
   }
 
   StringRef getELFTypeName() const {
-    uint8_t Type = getELFType();
-    for (const auto &EE : ElfSymbolTypes) {
-      if (EE.Value == Type) {
-        return EE.AltName;
-      }
-    }
-    return "";
+    return getElfSymbolTypes().toString(getELFType(), 1);
   }
 };
 

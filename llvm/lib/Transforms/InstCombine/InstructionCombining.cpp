@@ -172,12 +172,6 @@ void InstCombiner::IRBuilderInstCombineInserter::InsertHelper(
   IC.Worklist.add(I);
   if (auto *Assume = dyn_cast<AssumeInst>(I))
     IC.AC.registerAssumption(Assume);
-  if (auto *DbgSrc = IC.DebugMetadataSource) {
-    // We copy the old instruction's DebugLoc to the new instruction, unless
-    // InstCombine already assigned a DebugLoc to it, in which case we
-    // should trust the more specifically selected DebugLoc.
-    I->setDebugLoc(I->getDebugLoc().orElse(DbgSrc->getDebugLoc()));
-  }
 }
 
 std::optional<Instruction *>
@@ -5911,8 +5905,7 @@ bool InstCombinerImpl::run() {
 
     // Now that we have an instruction, try combining it to simplify it.
     Builder.SetInsertPoint(I);
-    // Set debug metadata and annotation source, used by the IRBuilder inserter.
-    DebugMetadataSource = I;
+    Builder.SetCurrentDebugLocation(I->getDebugLoc());
 
 #ifndef NDEBUG
     std::string OrigI;

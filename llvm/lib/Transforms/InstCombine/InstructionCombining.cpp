@@ -177,8 +177,6 @@ void InstCombiner::IRBuilderInstCombineInserter::InsertHelper(
     // InstCombine already assigned a DebugLoc to it, in which case we
     // should trust the more specifically selected DebugLoc.
     I->setDebugLoc(I->getDebugLoc().orElse(DbgSrc->getDebugLoc()));
-    // We also copy annotation metadata to the new instruction.
-    I->copyMetadata(*DbgSrc, LLVMContext::MD_annotation);
   }
 }
 

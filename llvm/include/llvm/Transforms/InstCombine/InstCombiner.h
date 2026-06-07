@@ -113,6 +113,10 @@ protected:
   SmallDenseSet<std::pair<const BasicBlock *, const BasicBlock *>, 8> BackEdges;
   bool ComputedBackEdges = false;
 
+  /// Instruction source for debug and annotation metadata, used by IRBuilder
+  /// inserter.
+  Instruction *DebugMetadataSource = nullptr;
+
 public:
   InstCombiner(InstructionWorklist &Worklist, Function &F, AAResults *AA,
                AssumptionCache &AC, TargetLibraryInfo &TLI,

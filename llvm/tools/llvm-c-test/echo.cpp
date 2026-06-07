@@ -1077,7 +1077,6 @@ struct FunCloner {
       LLVMSetMetadata(Dst, Kind, LLVMMetadataAsValue(Ctx, MD));
     }
     LLVMDisposeValueMetadataEntries(AllMetadata);
-    LLVMAddMetadataToInst(Builder, Dst);
 
     check_value_kind(Dst, LLVMInstructionValueKind);
     return VMap[Src] = Dst;

@@ -6011,25 +6011,6 @@ bool InstCombinerImpl::prepareWorklist(Function &F) {
           continue;
         }
 
-      // See if we can constant fold its operands.
-      for (Use &U : Inst.operands()) {
-        if (!isa<ConstantVector>(U) && !isa<ConstantExpr>(U))
-          continue;
-
-        auto *C = cast<Constant>(U);
-        Constant *&FoldRes = FoldedConstants[C];
-        if (!FoldRes)
-          FoldRes = ConstantFoldConstant(C, DL, &TLI);
-
-        if (FoldRes != C) {
-          LLVM_DEBUG(dbgs() << "IC: ConstFold operand of: " << Inst
-                            << "\n    Old = " << *C
-                            << "\n    New = " << *FoldRes << '\n');
-          U = FoldRes;
-          MadeIRChange = true;
-        }
-      }
-
       InstrsForInstructionWorklist.push_back(&Inst);
     }
 

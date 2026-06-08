@@ -104,8 +104,11 @@ protected:
   /// Edges that are known to never be taken.
   SmallDenseSet<std::pair<BasicBlock *, BasicBlock *>, 8> DeadEdges;
 
-  /// Order of predecessors to canonicalize phi nodes towards.
-  SmallDenseMap<BasicBlock *, SmallVector<BasicBlock *>, 8> PredOrder;
+  /// Order of predecessors to canonicalize phi nodes towards. First vector maps
+  /// block numbers to index in storage, 1-indexed (zero is uninitializedd),
+  /// second vector stores predecessors.
+  SmallVector<unsigned, 8> PredOrderIndices;
+  SmallVector<BasicBlock *> PredOrderStorage;
 
   /// Backedges, used to avoid pushing instructions across backedges in cases
   /// where this may result in infinite combine loops. For irreducible loops

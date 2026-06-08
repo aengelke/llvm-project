@@ -1556,9 +1556,10 @@ Instruction *InstCombinerImpl::visitPHINode(PHINode &PN) {
   // the blocks in the same order. This will help identical PHIs be eliminated
   // by other passes. Other passes shouldn't depend on this for correctness
   // however.
-  auto Res = PredOrder.try_emplace(PN.getParent());
-  if (!Res.second) {
-    const auto &Preds = Res.first->second;
+  if (PredOrderIndices.size() <= PN.getParent()->getNumber())
+    PredOrderIndices.resize(PN.getFunction()->getMaxBlockNumber());
+  if (unsigned &PredOrderIdx = PredOrderIndices[PN.getParent()->getNumber()]) {
+    BasicBlock *const *Preds = &PredOrderStorage[PredOrderIdx - 1];
     for (unsigned I = 0, E = PN.getNumIncomingValues(); I != E; ++I) {
       BasicBlock *BBA = PN.getIncomingBlock(I);
       BasicBlock *BBB = Preds[I];
@@ -1578,7 +1579,8 @@ Instruction *InstCombinerImpl::visitPHINode(PHINode &PN) {
     }
   } else {
     // Remember the block order of the first encountered phi node.
-    append_range(Res.first->second, PN.blocks());
+    PredOrderIdx = PredOrderStorage.size() + 1;
+    append_range(PredOrderStorage, PN.blocks());
   }
 
   // Is there an identical PHI node in this basic block?

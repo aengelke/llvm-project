@@ -75,7 +75,7 @@ public:
   }
 
   Value *FoldCmp(CmpInst::Predicate P, Value *LHS, Value *RHS) const override {
-    return simplifyCmpInst(P, LHS, RHS, SQ);
+    return ConstFolder.FoldCmp(P, LHS, RHS);
   }
 
   Value *FoldGEP(Type *Ty, Value *Ptr, ArrayRef<Value *> IdxList,

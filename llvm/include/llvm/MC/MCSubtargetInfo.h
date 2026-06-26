@@ -34,10 +34,8 @@ class MCInst;
 
 /// Used to provide key value pairs for feature and CPU bit flags.
 struct SubtargetFeatureKV {
-  // Note: PrivKey/PrivDesc should not be accessed and will be removed. They are
-  // not private to keep this struct POD.
-  const char *PrivKey;                  ///< K-V key string
-  const char *PrivDesc;                 ///< Help descriptor
+  uint16_t KeyStrOff;
+  uint16_t DescStrOff;
   unsigned Value;                       ///< K-V integer value
   FeatureBitArray Implies;              ///< K-V bit mask
 
@@ -45,8 +43,13 @@ struct SubtargetFeatureKV {
   SubtargetFeatureKV(const SubtargetFeatureKV &) = delete;
   SubtargetFeatureKV &operator=(const SubtargetFeatureKV &) = delete;
 
-  const char *key() const { return PrivKey; }
-  const char *desc() const { return PrivDesc; }
+  const char *key() const {
+    return reinterpret_cast<const char *>(this) + KeyStrOff;
+  }
+
+  const char *desc() const {
+    return reinterpret_cast<const char *>(this) + DescStrOff;
+  }
 
   /// Compare routine for std::lower_bound
   bool operator<(StringRef S) const { return StringRef(key()) < S; }
@@ -55,6 +58,12 @@ struct SubtargetFeatureKV {
   bool operator<(const SubtargetFeatureKV &Other) const {
     return StringRef(key()) < StringRef(Other.key());
   }
+};
+
+template <size_t NumFeatures, size_t FeatureStrTabSize>
+struct SubtargetFeatureKVStorage {
+  SubtargetFeatureKV Features[NumFeatures];
+  char Strings[FeatureStrTabSize];
 };
 
 //===----------------------------------------------------------------------===//

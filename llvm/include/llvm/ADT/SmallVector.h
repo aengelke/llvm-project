@@ -577,9 +577,16 @@ protected:
 
 public:
   void push_back(ValueParamT Elt) {
-    if (LLVM_UNLIKELY(this->size() >= this->capacity()))
-      return growAndPushBack(Elt);
-    std::memcpy(reinterpret_cast<void *>(this->end()), &Elt, sizeof(T));
+    if constexpr (TakesParamByValue) {
+      if (LLVM_UNLIKELY(this->size() >= this->capacity()))
+        return growAndPushBack(Elt);
+      std::memcpy(reinterpret_cast<void *>(this->end()), &Elt, sizeof(T));
+    } else {
+      T Tmp = Elt;
+      if (LLVM_UNLIKELY(this->size() >= this->capacity()))
+        this->grow(this->size() + 1);
+      std::memcpy(reinterpret_cast<void *>(this->end()), &Tmp, sizeof(T));
+    }
     this->set_size(this->size() + 1);
   }
 

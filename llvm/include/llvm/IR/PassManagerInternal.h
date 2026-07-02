@@ -38,6 +38,10 @@ namespace detail {
 /// polymorphically over pass objects.
 template <typename IRUnitT, typename AnalysisManagerT, typename... ExtraArgTs>
 struct PassConcept {
+  bool IsRequired;
+
+  explicit PassConcept(bool IsRequired = false) : IsRequired(IsRequired) {}
+
   // Boiler plate necessary for the container of derived classes.
   virtual ~PassConcept() = default;
 
@@ -61,7 +65,7 @@ struct PassConcept {
   /// from `RequiredPassInfoMixin` or `OptionalPassInfoMixin`.
   /// It's no-op to have `isRequired` always return false since that is the
   /// default.
-  virtual bool isRequired() const = 0;
+  bool isRequired() const { return IsRequired; }
 };
 
 /// A template wrapper used to implement the polymorphic API.
@@ -72,7 +76,8 @@ struct PassConcept {
 template <typename IRUnitT, typename PassT, typename AnalysisManagerT,
           typename... ExtraArgTs>
 struct PassModel : PassConcept<IRUnitT, AnalysisManagerT, ExtraArgTs...> {
-  explicit PassModel(PassT Pass) : Pass(std::move(Pass)) {}
+  using ConceptT = PassConcept<IRUnitT, AnalysisManagerT, ExtraArgTs...>;
+  explicit PassModel(PassT Pass) : ConceptT(PassT::isRequired()), Pass(std::move(Pass)) {}
   // We have to explicitly define all the special member functions because MSVC
   // refuses to generate them.
   PassModel(const PassModel &Arg) : Pass(Arg.Pass) {}
@@ -100,8 +105,6 @@ struct PassModel : PassConcept<IRUnitT, AnalysisManagerT, ExtraArgTs...> {
   }
 
   StringRef name() const override { return PassT::name(); }
-
-  bool isRequired() const override { return PassT::isRequired(); }
 
   PassT Pass;
 };

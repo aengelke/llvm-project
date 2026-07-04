@@ -156,16 +156,15 @@ template <typename DomTreeT> struct SemiNCAInfo {
 
   NodePtr getIDom(NodePtr BB) { return getNodeInfo(BB).IDom; }
 
-  TreeNodePtr getNodeForBlock(NodePtr BB, DomTreeT &DT) {
-    if (TreeNodePtr Node = DT.getNode(BB))
-      return Node;
-
+  TreeNodePtr createNodeForBlock(NodePtr BB, DomTreeT &DT) {
     // Haven't calculated this node yet?  Get or calculate the node for the
     // immediate dominator.
     NodePtr IDom = getIDom(BB);
 
     assert(IDom || DT.getNode(nullptr));
-    TreeNodePtr IDomNode = getNodeForBlock(IDom, DT);
+    TreeNodePtr IDomNode = DT.getNode(IDom);
+    if (!IDomNode)
+      IDomNode = createNodeForBlock(IDom, DT);
 
     // Add a new tree node for this NodeT, and link it as a child of
     // IDomNode
@@ -629,19 +628,9 @@ template <typename DomTreeT> struct SemiNCAInfo {
     // Attach the first unreachable block to AttachTo.
     getNodeInfo(NumToNode[1]).IDom = AttachTo->getBlock();
     // Loop over all of the discovered blocks in the function...
-    for (NodePtr W : llvm::drop_begin(NumToNode)) {
-      if (DT.getNode(W))
-        continue; // Already calculated the node before
-
-      NodePtr ImmDom = getIDom(W);
-
-      // Get or calculate the node for the immediate dominator.
-      TreeNodePtr IDomNode = getNodeForBlock(ImmDom, DT);
-
-      // Add a new tree node for this BasicBlock, and link it as a child of
-      // IDomNode.
-      DT.createNode(W, IDomNode);
-    }
+    for (NodePtr W : llvm::drop_begin(NumToNode))
+      if (!DT.getNode(W))
+        createNodeForBlock(W, DT);
   }
 
   void reattachExistingSubtree(DomTreeT &DT, const TreeNodePtr AttachTo) {

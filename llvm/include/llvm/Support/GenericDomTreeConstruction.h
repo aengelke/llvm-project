@@ -139,14 +139,14 @@ template <typename DomTreeT> struct SemiNCAInfo {
 
   InfoRec &getNodeInfo(NodePtr BB) {
     if constexpr (GraphHasNodeNumbers<NodePtr>) {
-      unsigned Idx = BB ? GraphTraits<NodePtr>::getNumber(BB) + 1 : 0;
+      // In a post-dominator tree, BB may be nullptr, which we map to index 0.
+      unsigned Idx = !IsPostDom || BB ? GraphTraits<NodePtr>::getNumber(BB) + IsPostDom : 0;
       if (Idx >= NodeInfos.size()) {
-        unsigned Max = 0;
-        if (BB)
-          Max = GraphTraits<decltype(BB->getParent())>::getMaxNumber(
-              BB->getParent());
-        // Max might be zero, graphs might not support getMaxNumber().
-        NodeInfos.resize(Max ? Max + 1 : Idx + 1);
+        if (!IsPostDom || BB)
+          NodeInfos.resize(GraphTraits<decltype(BB->getParent())>::getMaxNumber(
+              BB->getParent()) + IsPostDom);
+        else
+          NodeInfos.resize(1);
       }
       return NodeInfos[Idx];
     } else {

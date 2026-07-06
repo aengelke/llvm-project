@@ -1066,7 +1066,7 @@ BitcodeReader::BitcodeReader(BitstreamCursor Stream, StringRef Strtab,
                              StringRef ProducerIdentification,
                              LLVMContext &Context, Triple TTriple)
     : BitcodeReaderBase(std::move(Stream), Strtab), Context(Context),
-      BitcodeTargetTriple(TTriple),
+      BitcodeTargetTriple(std::move(TTriple)),
       ValueList(this->Stream.SizeInBytes(),
                 [this](unsigned ValID, BasicBlock *InsertBB) {
                   return materializeValue(ValID, InsertBB);
@@ -8734,7 +8734,7 @@ BitcodeModule::getModuleImpl(LLVMContext &Context, bool MaterializeAll,
   if (Error JumpFailed = Stream.JumpToBit(ModuleBit))
     return std::move(JumpFailed);
   auto *R = new BitcodeReader(std::move(Stream), Strtab, ProducerIdentification,
-                              Context, BitcodeTargetTriple);
+                              Context, std::move(BitcodeTargetTriple));
 
   std::unique_ptr<Module> M =
       std::make_unique<Module>(ModuleIdentifier, Context);

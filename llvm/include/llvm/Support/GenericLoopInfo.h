@@ -127,7 +127,7 @@ public:
       return true;
     if (!L)
       return false;
-    return contains(L->getParentLoop());
+    return contains(L->getHeader());
   }
 
   /// Return true if the specified basic block is in this loop.

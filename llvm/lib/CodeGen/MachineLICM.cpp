@@ -24,6 +24,7 @@
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineBlockFrequencyInfo.h"
+#include "llvm/CodeGen/MachineCycleAnalysis.h"
 #include "llvm/CodeGen/MachineDomTreeUpdater.h"
 #include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
@@ -303,6 +304,7 @@ namespace {
         AU.addRequired<MachineBlockFrequencyInfoWrapperPass>();
       AU.addRequired<MachineDominatorTreeWrapperPass>();
       AU.addRequired<AAResultsWrapperPass>();
+      AU.addPreserved<MachineCycleInfoWrapperPass>();
       AU.addPreserved<MachineLoopInfoWrapperPass>();
       AU.addPreserved<MachineRegisterClassInfoWrapperPass>();
       MachineFunctionPass::getAnalysisUsage(AU);
@@ -1732,6 +1734,7 @@ PreservedAnalyses MachineLICMBasePass<DerivedT, PreRegAlloc>::run(
   if (!Changed)
     return PreservedAnalyses::all();
   auto PA = getMachineFunctionPassPreservedAnalyses();
+  PA.preserve<MachineCycleAnalysis>();
   PA.preserve<MachineLoopAnalysis>();
   return PA;
 }

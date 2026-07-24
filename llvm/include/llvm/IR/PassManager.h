@@ -372,8 +372,8 @@ public:
       // as calling invalidate could (recursively) insert things into the map,
       // making any iterator or reference invalid.
       bool Inserted;
-      std::tie(IMapI, Inserted) =
-          IsResultInvalidated.insert({ID, Result.invalidate(IR, PA, *this)});
+      std::tie(IMapI, Inserted) = IsResultInvalidated.insert(
+          {ID, Result.invalidate(ID, IR, PA, *this)});
       (void)Inserted;
       assert(Inserted && "Should not have already inserted this ID, likely "
                          "indicates a dependency cycle!");

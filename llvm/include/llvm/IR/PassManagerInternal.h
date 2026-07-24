@@ -170,6 +170,10 @@ protected:
   AnalysisResultConcept(DestroyTy Destroy) : Destroy(Destroy) {}
 
 public:
+  // Results are immovable.
+  AnalysisResultConcept(const AnalysisResultConcept &) = delete;
+  AnalysisResultConcept &operator=(const AnalysisResultConcept &) = delete;
+
   /// Method to try and mark a result as invalid.
   ///
   /// When the outer analysis manager detects a change in some underlying
@@ -185,8 +189,13 @@ public:
   /// them. See the documentation in the \c AnalysisManager for more details.
   ///
   /// \returns true if the result is indeed invalid (the default).
-  bool invalidate(IRUnitT &IR, const PreservedAnalyses &PA, InvalidatorT &Inv) {
-    return Invalidate(*this, IR, PA, Inv);
+  bool invalidate(AnalysisKey *ID, IRUnitT &IR, const PreservedAnalyses &PA,
+                  InvalidatorT &Inv) {
+    if (Invalidate)
+      return Invalidate(*this, IR, PA, Inv);
+    auto PAC = PA.getChecker(ID);
+    return !PAC.preserved() &&
+           !PAC.template preservedSet<AllAnalysesOn<IRUnitT>>();
   }
 };
 
@@ -245,16 +254,13 @@ struct AnalysisResultModel
                       ExtraArgTs &&...ExtraArgs)
       : AnalysisResultConceptT(destroyImpl),
         Result(Pass.run(IR, AM, std::forward<ExtraArgTs>(ExtraArgs)...)) {
-    this->Invalidate = [](AnalysisResultConceptT &Self, IRUnitT &IR,
-                          const PreservedAnalyses &PA, InvalidatorT &Inv) {
-      if constexpr (ResultHasInvalidateMethod<IRUnitT, ResultT>::Value) {
+    if constexpr (ResultHasInvalidateMethod<IRUnitT, ResultT>::Value) {
+      this->Invalidate = [](AnalysisResultConceptT &Self, IRUnitT &IR,
+                            const PreservedAnalyses &PA, InvalidatorT &Inv) {
         ResultT &Result = static_cast<AnalysisResultModel &>(Self).Result;
         return Result.invalidate(IR, PA, Inv);
-      }
-      auto PAC = PA.template getChecker<PassT>();
-      return !PAC.preserved() &&
-             !PAC.template preservedSet<AllAnalysesOn<IRUnitT>>();
-    };
+      };
+    }
   }
 };
 

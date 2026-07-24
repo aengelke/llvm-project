@@ -192,7 +192,8 @@ inline void AnalysisManager<IRUnitT, ExtraArgTs...>::invalidate(
     // Result.invalidate may insert things into the map, invalidating our
     // iterator.
     bool Inserted =
-        IsResultInvalidated.insert({ID, Result.invalidate(IR, PA, Inv)}).second;
+        IsResultInvalidated.insert({ID, Result.invalidate(ID, IR, PA, Inv)})
+            .second;
     (void)Inserted;
     assert(Inserted && "Should never have already inserted this ID, likely "
                        "indicates a cycle!");

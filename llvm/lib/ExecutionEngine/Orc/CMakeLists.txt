@@ -71,6 +71,9 @@ add_llvm_component_library(LLVMOrcJIT
   DEPENDS
   intrinsics_gen
 
+  PRECOMPILE_HEADERS
+  [["llvm/ExecutionEngine/Orc/pch.h"]]
+
   LINK_LIBS
   ${LLVM_PTHREAD_LIB}
   ${rt_lib}

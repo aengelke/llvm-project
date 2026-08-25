@@ -245,6 +245,17 @@ CieRecord *EhFrameSection::addCie(EhSectionPiece &cie,
   if (!rec) {
     rec = make<CieRecord>();
     rec->cie = &cie;
+    parseCIE(*rec->cie);
+    if (rec->cie->u.cie.hasPersonality != !!personality)
+      Err(ctx) << "CIE personality augmentation-relocation mismatch";
+    if (ctx.arg.compactUnwind && personality) {
+      auto [it, inserted] = personalityMap.try_emplace(personality);
+      // NB: we never assign index 0, which is used for "no personality".
+      if (inserted)
+        it->second = personalityMap.size();
+      // TODO: error if personalityMap > maximum unsigned?
+      rec->personality = it->second;
+    }
     cieRecords.push_back(rec);
   }
   return rec;
@@ -280,15 +291,20 @@ template <endianness e> void EhFrameSection::addRecords(EhInputSection *sec) {
   for (EhSectionPiece &cie : sec->cies)
     offsetToCie[cie.inputOff] = addCie(cie, rels);
   for (EhSectionPiece &fde : sec->fdes) {
+    if (!isFdeLive(fde, rels))
+      continue;
     uint32_t id = endian::read32<e>(fde.data().data() + 4);
     CieRecord *rec = offsetToCie[fde.inputOff + 4 - id];
     if (!rec)
       Fatal(ctx) << sec << ": invalid CIE reference";
 
-    if (!isFdeLive(fde, rels))
-      continue;
     rec->fdes.push_back(&fde);
-    numFdes++;
+    if (ctx.arg.compactUnwind)
+      encodeAsCompactUnwind(ctx, *rec->cie, fde);
+    if (fde.compactUnwindDescriptors().empty()) {
+      rec->usedInEhFrame = true;
+      numFdes++;
+    }
   }
 }
 
@@ -299,7 +315,7 @@ void EhFrameSection::iterateFDEWithLSDAAux(
     EhInputSection &sec, DenseSet<size_t> &ciesWithLSDA,
     llvm::function_ref<void(InputSection &)> fn) {
   for (EhSectionPiece &cie : sec.cies)
-    if (hasLSDA(cie))
+    if (cie.u.cie.hasLSDA)
       ciesWithLSDA.insert(cie.inputOff);
   for (EhSectionPiece &fde : sec.fdes) {
     uint32_t id = endian::read32<ELFT::Endianness>(fde.data().data() + 4);
@@ -351,10 +367,15 @@ void EhFrameSection::finalizeContents() {
 
   size_t off = 0;
   for (CieRecord *rec : cieRecords) {
+    if (!rec->usedInEhFrame)
+      continue; // Don't write compact unwind CIEs and FDEs.
+
     rec->cie->outputOff = off;
     off += rec->cie->size;
 
     for (EhSectionPiece *fde : rec->fdes) {
+      if (!fde->compactUnwindDescriptors().empty())
+        continue;
       fde->outputOff = off;
       off += fde->size;
     }
@@ -372,10 +393,15 @@ void EhFrameSection::finalizeContents() {
 void EhFrameSection::writeTo(uint8_t *buf) {
   // Write CIE and FDE records.
   for (CieRecord *rec : cieRecords) {
+    if (!rec->usedInEhFrame)
+      continue; // Don't write compact unwind CIEs and FDEs.
+
     size_t cieOffset = rec->cie->outputOff;
     writeCieFde(ctx, buf + cieOffset, rec->cie->data());
 
     for (EhSectionPiece *fde : rec->fdes) {
+      if (!fde->compactUnwindDescriptors().empty())
+        continue;
       size_t off = fde->outputOff;
       writeCieFde(ctx, buf + off, fde->data());
 
@@ -395,30 +421,83 @@ void EhFrameSection::writeTo(uint8_t *buf) {
     return;
 
   // Write the .eh_frame_hdr section using cached FDE data from updateAllocSize.
-  bool large = hdr->large;
-  int64_t ehFramePtr = getParent()->addr - hdr->getVA() - 4;
-  auto writeField = [&](uint8_t *buf, uint64_t val) {
-    large ? write64(ctx, buf, val) : write32(ctx, buf, val);
-  };
-
   uint8_t *hdrBuf = ctx.bufferStart + hdr->getParent()->offset + hdr->outSecOff;
-  // version
-  hdrBuf[0] = 1;
-  // eh_frame_ptr_enc
-  hdrBuf[1] = DW_EH_PE_pcrel | (large ? DW_EH_PE_sdata8 : DW_EH_PE_sdata4);
-  // fde_count_enc
-  hdrBuf[2] = DW_EH_PE_udata4;
-  // table_enc
-  hdrBuf[3] = DW_EH_PE_datarel | (large ? DW_EH_PE_sdata8 : DW_EH_PE_sdata4);
-  hdrBuf += 4;
-  writeField(hdrBuf, ehFramePtr);
-  hdrBuf += large ? 8 : 4;
-  write32(ctx, hdrBuf, hdr->fdes.size());
-  hdrBuf += 4;
-  for (const FdeData &fde : hdr->fdes) {
-    writeField(hdrBuf, fde.pcRel);
-    writeField(hdrBuf + (large ? 8 : 4), fde.fdeVARel);
-    hdrBuf += large ? 16 : 8;
+  uint64_t hdrVA = hdr->getVA();
+  int64_t ehFramePtr = getParent()->addr - hdrVA - 4;
+
+  if (!ctx.arg.compactUnwind) {
+    bool large = hdr->large;
+    auto writeField = [&](uint8_t *buf, uint64_t val) {
+      large ? write64(ctx, buf, val) : write32(ctx, buf, val);
+    };
+    // version
+    hdrBuf[0] = 1;
+    // eh_frame_ptr_enc
+    hdrBuf[1] = DW_EH_PE_pcrel | (large ? DW_EH_PE_sdata8 : DW_EH_PE_sdata4);
+    // fde_count_enc
+    hdrBuf[2] = DW_EH_PE_udata4;
+    // table_enc
+    hdrBuf[3] = DW_EH_PE_datarel | (large ? DW_EH_PE_sdata8 : DW_EH_PE_sdata4);
+    hdrBuf += 4;
+    writeField(hdrBuf, ehFramePtr);
+    hdrBuf += large ? 8 : 4;
+    write32(ctx, hdrBuf, hdr->fdes.size());
+    hdrBuf += 4;
+    for (const FdeData &fde : hdr->fdes) {
+      writeField(hdrBuf, fde.pcRel);
+      writeField(hdrBuf + (large ? 8 : 4), fde.fdeVARel);
+      hdrBuf += large ? 16 : 8;
+    }
+    return;
+  }
+
+  hdrBuf[0] = 2;                                // version.
+  hdrBuf[1] = DW_EH_PE_pcrel | DW_EH_PE_sdata4; // format.
+  hdrBuf[2] = 0;                                // padding.
+  hdrBuf[3] = 0;                                // padding.
+  uint32_t personalitiesOff =
+      16 + 3 * sizeof(uint32_t) * (hdr->cuPages.size() + 1);
+  uint32_t globalDescsOff =
+      personalitiesOff + sizeof(int32_t) * personalityMap.size();
+  write32(ctx, hdrBuf + 4, personalitiesOff);
+  write32(ctx, hdrBuf + 8, globalDescsOff);
+  write32(ctx, hdrBuf + 12, hdr->cuPages.size());
+  hdrBuf += 16;
+  for (const auto &page : hdr->cuPages) {
+    write32(ctx, hdrBuf, page.pcRel);
+    write32(ctx, hdrBuf + 4, page.pageOff);
+    write32(ctx, hdrBuf + 8,
+            hdr->cuLSDAOff + sizeof(uint32_t) * page.firstLSDAEntry);
+    hdrBuf += 12;
+  }
+  // Sentinel page entry.
+  write32(ctx, hdrBuf, hdr->lastVARel);
+  write32(ctx, hdrBuf + 4, 0xdeaddead);
+  write32(ctx, hdrBuf + 8, 0); // XXX: last LSDA offset
+  hdrBuf += 12;
+  for (auto it : personalityMap) {
+    write32(ctx, hdrBuf, 0xdeadbeef); // XXX
+    hdrBuf += 4;
+  }
+  for (uint64_t desc : hdr->cuGlobalDescriptors) {
+    write64(ctx, hdrBuf, desc);
+    hdrBuf += 8;
+  }
+  for (const auto &page : hdr->cuPages) {
+    write16(ctx, hdrBuf, page.entries.size());
+    if (!page.localDescriptors.empty())
+      write16(ctx, hdrBuf + 2, 4 + sizeof(uint32_t) * page.entries.size());
+    else
+      write16(ctx, hdrBuf + 2, 0);
+    hdrBuf += 4;
+    for (uint32_t entry : page.entries) {
+      write32(ctx, hdrBuf, entry);
+      hdrBuf += 4;
+    }
+    for (uint64_t desc : page.localDescriptors) {
+      write64(ctx, hdrBuf, desc);
+      hdrBuf += 8;
+    }
   }
 }
 
@@ -433,12 +512,222 @@ bool EhFrameHeader::isNeeded() const {
   return isLive() && ctx.in.ehFrame->isNeeded();
 }
 
+namespace cu {
+constexpr unsigned PageSize = 0x1000;
+constexpr unsigned DescBits = 12;
+// Maximum number of global descriptors is the number of indexable descriptors
+// minus the maximum number of descriptors that could be written in a level 2
+// page (worst case: 4B entry + 8B desc => page full with PageSize/12 unique
+// descriptors).
+constexpr unsigned NumGlobalDescs = (1 << DescBits) - PageSize / 12;
+} // namespace cu
+
 void EhFrameHeader::finalizeContents() {
-  // Compute size: 4-byte header + eh_frame_ptr + fde_count + FDE table.
-  // Initially `large` is false; updateAllocSize may set it to true if addresses
-  // exceed the 32-bit range, then call finalizeContents again.
-  auto numFdes = ctx.in.ehFrame->numFdes;
-  size = 4 + (large ? 8 : 4) + 4 + numFdes * (large ? 16 : 8);
+  // llvm::dbgs() << "finalizeContents\n";
+  EhFrameSection *ehFrame = ctx.in.ehFrame.get();
+  if (!ctx.arg.compactUnwind) {
+    // Compute size: 4-byte header + eh_frame_ptr + fde_count + FDE table.
+    // Initially `large` is false; updateAllocSize may set it to true if addresses
+    // exceed the 32-bit range, then call finalizeContents again.
+    auto numFdes = ctx.in.ehFrame->numFdes;
+    size = 4 + (large ? 8 : 4) + 4 + numFdes * (large ? 16 : 8);
+    return;
+  }
+
+  SmallVector<CompactUnwindDescriptor> descs;
+  uint64_t hdrVA = getVA();
+
+  lastVARel = INT64_MIN;
+  for (CieRecord *rec : ehFrame->getCieRecords()) {
+    // uint8_t fdeEnc = getFdeEncoding(rec->cie);
+    for (EhSectionPiece *fde : rec->fdes) {
+      assert(fde->firstRelocation != -1u);
+      // The FDE has passed `isFdeLive`, so the first relocation's symbol is a
+      // live Defined.
+      auto *isec = cast<EhInputSection>(fde->sec);
+      auto &reloc = isec->rels[fde->firstRelocation];
+      assert(isa<Defined>(reloc.sym) && "isFdeLive should have checked this");
+      uint64_t pcRel = reloc.sym->getVA(ctx) + reloc.addend - hdrVA;
+      size_t start = descs.size();
+      if (int64_t(pcRel + fde->u.fde.addrRange) > lastVARel)
+        lastVARel = pcRel + fde->u.fde.addrRange;
+      // newLarge |= !isInt<32>(pcRel); XXX
+      if (fde->compactUnwindDescriptors().empty()) {
+        uint64_t fdeVARel = ehFrame->getParent()->addr + fde->outputOff - hdrVA;
+        assert(isInt<29>(fdeVARel)); // TODO: error
+        descs.push_back({pcRel, uint64_t{7} << 29 | fdeVARel});
+      } else {
+        for (const auto &desc : fde->compactUnwindDescriptors())
+          descs.push_back(CompactUnwindDescriptor{desc.off + pcRel, desc.desc});
+        // Epilogue in descriptors is relative to the next descriptor or the end
+        // of the function. Because there might be padding afterwards, add a
+        // zero terminator here. Use value 1 to indicate that the actual value
+        // is meaningless and that this descriptor can be optimized away.
+        // TODO: as an initial approximation, only add this if the preceding
+        // descriptor actually has an epilogue.
+        descs.push_back({pcRel + fde->u.fde.addrRange, 1});
+        // TODO: collect LSDA if personality is set
+      }
+      // for (size_t i = start; i != descs.size(); ++i)
+      //   llvm::dbgs() << "Got CU: "
+      //                << llvm::format("%016zx %016zx", descs[i].desc,
+      //                                descs[i].off + hdrVA) << "\n";
+    }
+  }
+
+  llvm::stable_sort(descs,
+                    [](const auto &a, const auto &b) { return a.off < b.off; });
+
+  // TODO: optimize descs
+  // Optimize descriptors. The first and last descriptor cannot be removed,
+  // because they describe the address range.
+  //
+  // This loop only modifies or removes descriptors. j tracks the index of
+  // rewritten descriptors, j <= i.
+  size_t j = 1;
+  for (size_t i = 1; i < descs.size() - 1; ++i) {
+    uint64_t &prevDesc = descs[j - 1].desc;
+    uint64_t prevSz = descs[i].off - descs[j - 1].off;
+    uint64_t &curDesc = descs[i].desc;
+    uint64_t curSz = descs[i + 1].off - descs[i].off;
+
+    // For padding descriptors, fold as much into the epilogue of the preceding
+    // descriptor as possible.
+    if (curDesc == 1) {
+      uint64_t prevEpilogueSize = (prevDesc >> 40) & 0xff;
+      // If the previous descriptor has no epilogue, it is safe to extend it
+      // through the entire padding region.
+      if (prevEpilogueSize == 0)
+        continue;
+      // Entire padding fits into the epilogue of the previous descriptor.
+      if (prevEpilogueSize + curSz < 0x100) {
+        prevEpilogueSize += curSz;
+        uint64_t mask = uint64_t{0xff} << 40;
+        prevDesc = (prevDesc & ~mask) | (prevEpilogueSize << 40);
+        continue;
+      }
+    }
+    // Null descriptors can be folded into null descriptors.
+    // TODO: fold null descriptor into previous descriptor with an epilogue
+    // where the epilogue size already exceeds the natural epilogue size. (This
+    // is valid, because null descriptors can only be at the bottom of the call
+    // stack.)
+    if (curDesc == 0) {
+      if (prevDesc == 0)
+        continue;
+    }
+    // TODO: descriptors with a prologue longer than the natural prologue size
+    // can subsume previous null/padding descriptors.
+
+    descs[j] = descs[i];
+    j += 1;
+  }
+  descs[j] = descs[descs.size() - 1];
+  descs.resize(j + 1);
+  /*
+j = 1
+for i in range(1, len(descriptors) - 1):
+    p, d = descriptors[j - 1][1], descriptors[i][1]
+    psz = descriptors[i][0] - descriptors[j - 1][0]
+    sz = descriptors[i + 1][0] - descriptors[i][0]
+    pepsz, dprsz = (p >> 40) & 0xff, (d >> 32) & 0xff
+    pmode, dmode = (p >> 29) & 3, (d >> 29) & 3
+    if d <= 1 and pmode == 2:
+        naturaleplen = 0 \
+                + (1 if p & 1 else 0) \
+                + (2 if p & 2 else 0) \
+                + (2 if p & 4 else 0) \
+                + (2 if p & 8 else 0) \
+                + (2 if p & 16 else 0) \
+                + (1 if p & 32 else 0)
+        #print(hex(d), hex(p), naturaleplen, pepsz, sz)
+        if pepsz >= naturaleplen and pepsz + sz < 256:
+            descriptors[j - 1] = descriptors[j - 1][0], (p & ~(0xff << 40)) | ((pepsz + sz) << 40)
+            continue
+    if d <= 1 and pmode == 1:
+        if pepsz != 0 and pepsz + sz < 256:
+            descriptors[j - 1] = descriptors[j - 1][0], (p & ~(0xff << 40)) | ((pepsz + sz) << 40)
+            continue
+    if psz == 0:
+        descriptors[j - 1] = descriptors[j - 1][0], d
+        continue
+    if d == 1:
+        d = 0
+    descriptors[j] = descriptors[i][0], d
+    j += 1
+descriptors = descriptors[:j]
+  */
+
+  // Compute descriptors that occur most often.
+  MapVector<uint64_t, size_t> descCountMap;
+  for (const CompactUnwindDescriptor &desc : descs)
+    descCountMap[desc.desc] += 1;
+  auto descCounts = descCountMap.takeVector();
+  llvm::sort(descCounts, [](const auto &a, const auto &b) {
+    return std::tie(a.second, a.first) > std::tie(b.second, b.first);
+  });
+  // for (auto [idx, entry] : enumerate(descCounts))
+  //   llvm::dbgs() << "desc " << idx << " " << entry.first << " " << entry.second
+  //                << "\n";
+  if (descCounts.size() > cu::NumGlobalDescs)
+    descCounts.resize(cu::NumGlobalDescs);
+  DenseMap<uint64_t, unsigned> globalDescMap;
+  cuGlobalDescriptors.clear();
+  cuGlobalDescriptors.reserve(descCounts.size());
+  for (auto [idx, entry] : enumerate(descCounts)) {
+    cuGlobalDescriptors.push_back(entry.first);
+    globalDescMap[entry.first] = idx;
+  }
+
+  cuPages.clear();
+  DenseMap<uint64_t, size_t> localDescMap;
+  size_t descIdx = 0;
+  while (descIdx < descs.size()) {
+    localDescMap.clear();
+    CompactUnwindPage &page = cuPages.emplace_back();
+    page.pcRel = descs[descIdx].off;
+    page.firstLSDAEntry = 0; // XXX
+    while (descIdx < descs.size()) {
+      // Remaining size on the page.
+      size_t remainingSize = cu::PageSize - page.size();
+      assert(remainingSize <= cu::PageSize && "overflow");
+      if (remainingSize < sizeof(uint32_t))
+        break; // We can't add another entry.
+      int64_t pcDelta = descs[descIdx].off - page.pcRel;
+      if (!isUInt<32 - cu::DescBits>(pcDelta))
+        break; // The offset from the page's first address is too large.
+
+      uint64_t desc = descs[descIdx].desc;
+      unsigned descNum;
+      if (auto it = globalDescMap.find(desc); it != globalDescMap.end()) {
+        descNum = it->second;
+      } else {
+        // Need a local entry for the descriptor.
+        auto [it2, inserted] = localDescMap.try_emplace(desc);
+        if (inserted) {
+          if (remainingSize < sizeof(uint32_t) + sizeof(uint64_t))
+            break; // Can't fit in the second descriptor.
+          it2->second = cu::NumGlobalDescs + page.localDescriptors.size();
+          page.localDescriptors.push_back(desc);
+        }
+        descNum = it2->second;
+      }
+      page.entries.push_back(pcDelta << cu::DescBits | descNum);
+      descIdx += 1;
+    }
+  }
+
+  size = 16;                                           // Header.
+  size += 3 * sizeof(uint32_t) * (cuPages.size() + 1); // Add sentinel entry.
+  size += sizeof(uint64_t) * cuGlobalDescriptors.size();
+  size += sizeof(uint32_t) * ehFrame->personalityMap.size();
+  for (CompactUnwindPage &page : cuPages) {
+    page.pageOff = size;
+    size += page.size();
+  }
+  cuLSDAOff = size;
+  // llvm::dbgs() << "size=" << size << "\n";
+  // size += 2 * sizeof(uint32_t) * cuLSDAs.size();
 }
 
 bool EhFrameHeader::updateAllocSize(Ctx &ctx) {
@@ -455,12 +744,16 @@ bool EhFrameHeader::updateAllocSize(Ctx &ctx) {
   // .eh_frame_hdr's VA.
   fdes.clear();
   for (CieRecord *rec : ehFrame->getCieRecords()) {
-    uint8_t enc = getFdeEncoding(rec->cie);
+    if (!rec->usedInEhFrame)
+      continue;
+    uint8_t enc = rec->cie->u.cie.fdeEncoding;
     if ((enc & 0x70) != DW_EH_PE_absptr && (enc & 0x70) != DW_EH_PE_pcrel) {
       Err(ctx) << "unknown FDE size encoding";
       continue;
     }
     for (EhSectionPiece *fde : rec->fdes) {
+      if (!fde->compactUnwindDescriptors().empty())
+        continue;
       // The FDE has passed `isFdeLive`, so the first relocation's symbol is a
       // live Defined.
       auto *isec = cast<EhInputSection>(fde->sec);

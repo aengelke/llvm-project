@@ -24,6 +24,7 @@
 namespace lld {
 namespace elf {
 
+struct CompactUnwindDescriptor;
 class InputFile;
 class Symbol;
 
@@ -374,15 +375,35 @@ private:
 struct EhSectionPiece {
   EhSectionPiece(size_t off, InputSectionBase *sec, uint32_t size,
                  unsigned firstRelocation)
-      : inputOff(off), sec(sec), size(size), firstRelocation(firstRelocation) {}
+      : inputOff(off), sec(sec), u{{nullptr, 0, 0}}, size(size), firstRelocation(firstRelocation) {}
 
   ArrayRef<uint8_t> data() const {
     return {sec->content().data() + this->inputOff, size};
   }
 
+  ArrayRef<CompactUnwindDescriptor> compactUnwindDescriptors() const {
+    return {u.fde.cuDescs, u.fde.cuDescSize};
+  }
+
   size_t inputOff;
   ssize_t outputOff = -1;
   InputSectionBase *sec;
+  union {
+    struct FDE {
+      CompactUnwindDescriptor *cuDescs;
+      uint32_t cuDescSize;
+      // ArrayRef<CompactUnwindDescriptor> compactUnwindDescriptors;
+      uint32_t addrRange;
+    } fde;
+    struct CIE {
+      uint8_t fdeEncoding;
+      bool hasPersonality;
+      bool hasLSDA;
+      uint32_t codeAlignmentFactor;
+      int32_t dataAlignmentFactor;
+      uint32_t cfiBegin; ///< Offset in piece where CFI instructions begin.
+    } cie;
+  } u;
   uint32_t size;
   unsigned firstRelocation;
 };

@@ -12,10 +12,21 @@
 #include "lld/Common/LLVM.h"
 
 namespace lld::elf {
+struct Ctx;
 struct EhSectionPiece;
+struct CompactUnwindDescriptor {
+  uint64_t off;
+  uint64_t desc;
+};
 
-uint8_t getFdeEncoding(EhSectionPiece *p);
-bool hasLSDA(const EhSectionPiece &p);
+/// Parse CIE and init the cie union member of the EhSectionPiece.
+void parseCIE(EhSectionPiece &cie);
+
+/// Try to encode an FDE using compact unwind descriptors. If encoding failed,
+/// the compactUnwindDescriptors array is empty. In any case, this extracts the
+/// address range from the FDE.
+void encodeAsCompactUnwind(Ctx &ctx, const EhSectionPiece &cie,
+                           EhSectionPiece &fde);
 }
 
 #endif

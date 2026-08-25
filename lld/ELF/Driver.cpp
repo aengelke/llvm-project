@@ -1409,6 +1409,7 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
   ctx.arg.checkSections =
       args.hasFlag(OPT_check_sections, OPT_no_check_sections, true);
   ctx.arg.chroot = args.getLastArgValue(OPT_chroot);
+  ctx.arg.compactUnwind = hasZOption(args, "compact-unwind");
   if (auto *arg = args.getLastArg(OPT_compress_debug_sections)) {
     ctx.arg.compressDebugSections =
         getCompressionType(ctx, arg->getValue(), "--compress-debug-sections");

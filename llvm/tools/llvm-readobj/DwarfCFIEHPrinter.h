@@ -16,6 +16,7 @@
 #include "llvm/DebugInfo/DWARF/DWARFContext.h"
 #include "llvm/DebugInfo/DWARF/DWARFDataExtractor.h"
 #include "llvm/DebugInfo/DWARF/DWARFDebugFrame.h"
+#include "llvm/DebugInfo/DWARF/DWARFUnwindTablePrinter.h"
 #include "llvm/Object/ELF.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/ELFTypes.h"
@@ -93,6 +94,168 @@ void PrinterContext<ELFT>::printUnwindInformation() const {
   }
 }
 
+static Expected<dwarf::UnwindTable>
+createX86_64CompactUnwindTable(ArrayRef<std::pair<uint64_t, uint64_t>> Descs) {
+  using namespace llvm::dwarf;
+  UnwindRow NullRow;
+  NullRow.getCFAValue() = UnwindLocation::createIsRegisterPlusOffset(7, 8);
+  NullRow.getRegisterLocations().setRegisterLocation(
+      16, UnwindLocation::createAtCFAPlusOffset(-8));
+
+  UnwindTable::RowContainer Rows;
+
+  static constexpr uint8_t RegSaveOrder[] = {
+      // X86::RBP, X86::R15, X86::R14, X86::R13, X86::R12, X86::RBX,
+      6, 15, 14, 13, 12, 3,
+  };
+
+  for (auto [Idx, Entry] : enumerate(Descs.drop_back())) {
+    uint64_t Loc = Entry.first;
+    uint64_t Len = Descs[Idx + 1].first - Loc;
+    uint64_t Desc = Entry.second;
+    unsigned Mode = (Desc >> 29) & 0x7;
+    unsigned PrologueSize = (Desc >> 32) & 0xff;
+    unsigned EpilogueSize = (Desc >> 40) & 0xff;
+    if (Len < PrologueSize + EpilogueSize)
+      return createStringError(errc::invalid_argument,
+                               "CU len smaller than prologue+epilogue");
+    switch (Mode) {
+    case 7: // DWARF
+      // TODO: read FDE here?
+      break;
+    case 0: // NULL
+      NullRow.setAddress(Loc);
+      Rows.push_back(NullRow);
+      break;
+    case 1: { // RBP
+      unsigned InnerPrologueSize = (Desc >> 18) & 0xff;
+      uint64_t MovRbpRspLoc = Loc;
+      UnwindRow Row = NullRow;
+      if (PrologueSize > InnerPrologueSize + 3) {
+        Row.setAddress(Loc);
+        Rows.push_back(Row);
+        MovRbpRspLoc = Loc + PrologueSize - InnerPrologueSize - 3;
+      }
+      Row.setAddress(MovRbpRspLoc);
+      Row.getRegisterLocations().setRegisterLocation(
+          6, UnwindLocation::createAtCFAPlusOffset(-16));
+      Row.getCFAValue() = UnwindLocation::createIsRegisterPlusOffset(7, 16);
+      if (PrologueSize > InnerPrologueSize)
+        Rows.push_back(Row);
+      Row.setAddress(Loc + PrologueSize - InnerPrologueSize);
+      Row.getCFAValue() = UnwindLocation::createIsRegisterPlusOffset(6, 16);
+      if (PrologueSize > 0 && PrologueSize >= InnerPrologueSize)
+        Rows.push_back(Row);
+      unsigned SaveOff = 8;
+      for (auto [Idx, Reg] : enumerate(RegSaveOrder)) {
+        if (!(Desc & (1 << Idx)))
+          continue;
+        SaveOff += 8;
+        Row.getRegisterLocations().setRegisterLocation(
+            Reg, UnwindLocation::createAtCFAPlusOffset(-SaveOff));
+      }
+      if (PrologueSize == 0 || PrologueSize < InnerPrologueSize ||
+          SaveOff != 16) {
+        Row.setAddress(Loc + PrologueSize);
+        Rows.push_back(Row);
+      }
+      if (EpilogueSize > 0) {
+        NullRow.setAddress(Loc + Len - EpilogueSize);
+        Rows.push_back(NullRow);
+      }
+      break;
+    }
+    case 2: { // RSP
+      unsigned FrameSize = 8 * ((Desc >> 6) & 0xfffff);
+      unsigned SavedRegs = 0;
+      unsigned NaturalPrologueSize = 0;
+      for (auto [Idx, Reg] : enumerate(RegSaveOrder)) {
+        if (!(Desc & (1 << Idx)))
+          continue;
+        if (SavedRegs > 0)
+          NaturalPrologueSize += Reg < 8 ? 1 : 2;
+        SavedRegs += 1;
+      }
+      unsigned SubRspDelta = FrameSize - 8 * (SavedRegs + 1);
+      unsigned SubRspSize = SubRspDelta == 0    ? 0
+                            : SubRspDelta == 8  ? 1
+                            : SubRspDelta < 128 ? 4
+                                                : 7;
+      if (SavedRegs > 0)
+        NaturalPrologueSize += SubRspSize;
+
+      DEBUG_WITH_TYPE("compact-unwind",
+                      dbgs() << "Loc=" << Loc << " FrameSize=" << FrameSize
+                             << " NPS=" << NaturalPrologueSize
+                             << " PS=" << PrologueSize << " SR=" << SavedRegs
+                             << " SRS=" << SubRspSize << "\n");
+
+      UnwindRow Row = NullRow;
+      Row.setAddress(Loc);
+      if (PrologueSize > NaturalPrologueSize)
+        Rows.push_back(Row);
+      uint64_t PrologueLoc = Loc + PrologueSize - NaturalPrologueSize;
+      unsigned SaveOff = 8;
+      for (auto [Idx, Reg] : enumerate(RegSaveOrder)) {
+        if (!(Desc & (1 << Idx)))
+          continue;
+        if (SaveOff > 8)
+          PrologueLoc += Reg < 8 ? 1 : 2;
+        SaveOff += 8;
+        Row.getCFAValue() =
+            UnwindLocation::createIsRegisterPlusOffset(7, SaveOff);
+        Row.getRegisterLocations().setRegisterLocation(
+            Reg, UnwindLocation::createAtCFAPlusOffset(-SaveOff));
+        Row.setAddress(PrologueLoc);
+        if (int64_t(PrologueLoc) >= int64_t(Loc))
+          Rows.push_back(Row);
+      }
+      if (SubRspSize != 0 || PrologueLoc + SubRspSize != Loc + PrologueSize) {
+        Row.setAddress(Loc + PrologueSize);
+        Row.getCFAValue() =
+            UnwindLocation::createIsRegisterPlusOffset(7, FrameSize);
+        Rows.push_back(Row);
+      }
+      if (EpilogueSize > 0) {
+        uint64_t EpilogueLoc = Loc + Len - EpilogueSize;
+        bool First = true;
+        DEBUG_WITH_TYPE("compact-unwind",
+                        dbgs() << "ELoc=" << EpilogueLoc
+                               << " ES=" << EpilogueSize << " SR=" << SavedRegs
+                               << " SRS=" << SubRspSize << "\n");
+        if (SubRspSize > 0) {
+          Row.getCFAValue() =
+              UnwindLocation::createIsRegisterPlusOffset(7, SaveOff);
+          Row.setAddress(EpilogueLoc);
+          Rows.push_back(Row);
+          First = false;
+        }
+        for (auto [Idx, Reg] : enumerate(reverse(RegSaveOrder))) {
+          if (!(Desc & (1 << (5 - Idx))))
+            continue;
+          if (!First)
+            EpilogueLoc += Reg < 8 ? 1 : 2;
+          First = false;
+          SaveOff -= 8;
+          Row.getCFAValue() =
+              UnwindLocation::createIsRegisterPlusOffset(7, SaveOff);
+          Row.getRegisterLocations().removeRegisterLocation(Reg);
+          Row.setAddress(EpilogueLoc);
+          if (EpilogueLoc >= Loc + Len)
+            break;
+          Rows.push_back(Row);
+        }
+      }
+      break;
+    }
+    default:
+      return createStringError(errc::invalid_argument,
+                               "unsupported compact unwind mode %d", Mode);
+    }
+  }
+  return UnwindTable(std::move(Rows));
+}
+
 template <typename ELFT>
 void PrinterContext<ELFT>::printEHFrameHdr(const Elf_Phdr *EHFramePHdr) const {
   DictScope L(W, "EHFrameHeader");
@@ -121,6 +284,76 @@ void PrinterContext<ELFT>::printEHFrameHdr(const Elf_Phdr *EHFramePHdr) const {
 
   auto Version = DE.getU8(&Offset);
   W.printNumber("version", Version);
+  if (Version == 2) {
+    // Collect pairs of address and descriptor for printing the unwind table.
+    SmallVector<std::pair<uint64_t, uint64_t>> Descs;
+
+    uint64_t PtrEnc = DE.getU8(&Offset);
+    W.startLine() << format("ptr_enc: 0x%" PRIx64 "\n", PtrEnc);
+    if (PtrEnc != (dwarf::DW_EH_PE_pcrel | dwarf::DW_EH_PE_sdata4))
+      reportError(object::createError("unexpected encoding ptr_enc"),
+                  ObjF.getFileName());
+    DE.getU16(&Offset); // Padding.
+    uint32_t PersonalitiesOff = DE.getU32(&Offset);
+    uint32_t GlobalDescsOff = DE.getU32(&Offset);
+    uint32_t PageCount = DE.getU32(&Offset);
+    for (uint32_t i = 0; i != PageCount + 1; ++i) {
+      dbgs() << "Page " << i << "/" << PageCount << "\n";
+      uint32_t Pc = EHFrameHdrAddress + DE.getU32(&Offset);
+      uint64_t PageStart = DE.getU32(&Offset);
+      uint32_t FirstLSDAOff = DE.getU32(&Offset);
+      // Print entry even for the sentinel page.
+      DictScope D(W, std::string("page ") + std::to_string(i));
+      W.startLine() << format("pc: 0x%" PRIx64 "\n", Pc);
+
+      uint64_t PageOff = PageStart;
+      unsigned EntryCount = DE.getU16(&PageOff);
+      uint64_t LocalDescsOff = PageStart + DE.getU16(&PageOff);
+      dbgs() << "Page " << i << "/" << PageCount << " " << EntryCount << " "
+             << PageOff << "\n";
+
+      if (i == PageCount) {
+        if (EntryCount != 0)
+          reportError(object::createError("sentinel CU page must be empty"),
+                      ObjF.getFileName());
+        Descs.emplace_back(Pc, 0);
+        break;
+      }
+
+      for (unsigned j = 0; j != EntryCount; ++j) {
+        uint32_t Entry = DE.getU32(&PageOff);
+        uint32_t DescIdx = Entry & 0xfff;
+        uint64_t DescOff;
+        if (DescIdx < 0x1000 - 341)
+          DescOff = GlobalDescsOff + sizeof(uint64_t) * DescIdx;
+        else
+          DescOff = LocalDescsOff + sizeof(uint64_t) * (DescIdx - 0x1000 + 341);
+        uint64_t Desc = DE.getU64(&DescOff);
+        // XXX: print personality function, if any?
+        if (((Desc >> 29) & 7) == 7) {
+          uint64_t FDEAddr = EHFrameHdrAddress + (Desc & 0x1fffffff);
+          W.startLine() << format("entry: 0x%" PRIx64 " %016" PRIx64
+                                  " (FDE 0x%" PRIx64 ")\n",
+                                  Pc + (Entry >> 12), Desc, FDEAddr);
+        } else {
+          W.startLine() << format("entry: 0x%" PRIx64 " %016" PRIx64 "\n",
+                                  Pc + (Entry >> 12), Desc);
+        }
+        Descs.emplace_back(Pc + (Entry >> 12), Desc);
+      }
+    }
+    // XXX: LSDA table
+
+    // Construct unwind table from descriptors.
+    //
+    if (Expected<dwarf::UnwindTable> RowsOrErr =
+            createX86_64CompactUnwindTable(Descs))
+      printUnwindTable(*RowsOrErr, W.getOStream(), DIDumpOptions{}, 1);
+    else
+      reportError(RowsOrErr.takeError(), ObjF.getFileName());
+    return;
+  }
+
   if (Version != 1)
     reportError(
         object::createError("only version 1 of .eh_frame_hdr is supported"),

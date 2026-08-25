@@ -343,6 +343,7 @@ struct Config {
   bool branchToBranch = false;
   bool checkSections;
   bool checkDynamicRelocs;
+  bool compactUnwind = false;
   std::optional<llvm::DebugCompressionType> compressDebugSections;
   llvm::SmallVector<
       std::tuple<llvm::GlobPattern, llvm::DebugCompressionType, unsigned>, 0>

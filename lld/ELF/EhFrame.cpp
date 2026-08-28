@@ -24,6 +24,8 @@
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/Support/LEB128.h"
 
+#define DEBUG_TYPE "lld-ehframe"
+
 using namespace llvm;
 using namespace llvm::ELF;
 using namespace llvm::dwarf;
@@ -41,8 +43,20 @@ struct EhReader {
              << isec->getObjMsg((const uint8_t *)loc - isec->content().data());
   }
 
-  uint8_t readByte();
-  void skipBytes(size_t count);
+  bool empty() const { return d.empty(); }
+
+  const uint8_t *takeN(size_t count) {
+    if (d.size() < count)
+      errOn(d.data(), "CIE/FDE is too small");
+    const uint8_t *res = d.data();
+    d = d.slice(count);
+    return res;
+  }
+
+  uint8_t readByte() { return *takeN(1); }
+  uint16_t read16() { return ::read16(isec->file->ctx, takeN(2)); }
+  uint32_t read32() { return ::read32(isec->file->ctx, takeN(4)); }
+  void skipBytes(size_t count) { takeN(count); }
   StringRef readString();
   uint64_t readULeb128();
   int64_t readSLeb128();
@@ -51,24 +65,6 @@ struct EhReader {
   InputSectionBase *isec;
   ArrayRef<uint8_t> d;
 };
-}
-
-// Read a byte and advance D by one byte.
-uint8_t EhReader::readByte() {
-  if (d.empty()) {
-    errOn(d.data(), "unexpected end of CIE");
-    return 0;
-  }
-  uint8_t b = d.front();
-  d = d.slice(1);
-  return b;
-}
-
-void EhReader::skipBytes(size_t count) {
-  if (d.size() < count)
-    errOn(d.data(), "CIE is too small");
-  else
-    d = d.slice(count);
 }
 
 // Read a null-terminated string.
@@ -187,6 +183,201 @@ void elf::parseCIE(EhSectionPiece &p) {
   p.u.cie.cfiBegin = p.data().size() - reader.d.size();
 }
 
+struct CFIState {
+  using Reg = uint8_t;
+
+  uint64_t cfaOff = 0;   ///< CFA offset (unscaled).
+  Reg cfaReg = Reg(-1u); ///< CFA base register.
+  /// Saved register at offset (scaled by data alignment factor).
+  SmallVector<std::pair<Reg, uint64_t>, 8> regs;
+
+  void defCFARegister(Reg reg) {
+    cfaReg = reg;
+  }
+
+  void defCFAOffset(uint64_t offset) {
+    cfaOff = offset;
+  }
+
+  void store(Reg reg, uint64_t scaledOff) {
+    for (auto &entry : regs) {
+      if (entry.first == reg) {
+        entry.second = scaledOff;
+        return;
+      }
+    }
+    regs.emplace_back(reg, scaledOff);
+  }
+
+  void restore(Reg reg) {
+    for (unsigned i = 0; i != regs.size(); i++) {
+      if (regs[i].first == reg) {
+        std::swap(regs[i], regs.back());
+        regs.pop_back();
+        return;
+      }
+    }
+  }
+
+  void print(raw_ostream &os) const {
+    os << "CFIState{r" << unsigned(cfaReg) << "+" << cfaOff;
+    for (const auto &[reg, off] : regs)
+      os << ",r" << unsigned(reg) << "@" << off;
+    os << "}";
+  }
+};
+
+class CUBuilderX86 {
+  SmallVector<CompactUnwindDescriptor, 4> descs;
+  const EhSectionPiece &fde;
+  const EhSectionPiece &cie;
+
+  size_t curOffset = 0;
+  CFIState curState;
+
+public:
+  CUBuilderX86(const EhSectionPiece &fde, const EhSectionPiece &cie)
+      : fde(fde), cie(cie) {}
+
+  ArrayRef<CompactUnwindDescriptor> getDescs() const { return descs; }
+
+  static std::optional<uint64_t> encode(const CFIState &curState) {
+    enum : uint8_t {
+      RAX = 0,
+      RBX = 3,
+      RBP = 6,
+      RSP = 7,
+      R12 = 12,
+      R13 = 13,
+      R14 = 14,
+      R15 = 15,
+      RIP = 16,
+    };
+
+    if (curState.cfaOff % 8 != 0)
+      return std::nullopt;
+
+    // Reg save order: RIP, RBP, R15, R14, R13, R12, RBX. All registers but RIP
+    // are optional.
+    CFIState::Reg regs[7] = {};
+    for (const auto &[reg, off] : curState.regs) {
+      if (off == 0 || off > 8)
+        return std::nullopt;
+      regs[off - 1] = reg;
+    }
+    if (regs[0] != RIP)
+      return std::nullopt;
+    static constexpr CFIState::Reg saveOrder[] = {RBP, R15, R14, R13, R12, RBX};
+    unsigned regMask = 0;
+    unsigned regCount = 1; // RIP
+    for (unsigned i = 0; i < 6; i++) {
+      if (regs[regCount] == saveOrder[i]) {
+        regMask |= 1 << i;
+        regCount += 1;
+      }
+    }
+    if (regCount != curState.regs.size())
+      return std::nullopt;
+
+    if (curState.cfaReg == RBP) {
+      if (curState.cfaOff != 16)
+        return std::nullopt;
+      // mode:3, personality:3, prologue_size:8, reserved:12, saved_regs:6.
+      return (1u << 29) | regMask;
+    }
+
+    if (curState.cfaReg != RSP)
+      return std::nullopt;
+
+    // We ignore all callee-saved registers below RSP.
+    if (curState.cfaOff == 8)
+      return 0; // Empty frame.
+
+    // mode:3, personality:3, frame_size:20, saved_regs:6.
+    // Lowest 3 bits of cfaOff are known to be zero, checked above.
+    if ((curState.cfaOff >> 3) >= uint64_t{1} << 20)
+      return std::nullopt;
+    return (2u << 29) | (curState.cfaOff << (6 - 3)) | regMask;
+  }
+
+  bool handleAdvance(size_t delta) {
+    delta *= cie.u.cie.codeAlignmentFactor;
+    LLVM_DEBUG(dbgs() << "advance " << curOffset << "+" << delta << " ";
+               curState.print(dbgs());
+               dbgs() << "\n";);
+    std::optional<uint64_t> desc = encode(curState);
+    if (!desc) {
+      LLVM_DEBUG(dbgs() << "FAIL: unable to encode\n");
+      return true;
+    }
+    descs.push_back(CompactUnwindDescriptor{curOffset, *desc});
+    curOffset += delta;
+    if (curOffset > fde.u.fde.addrRange) {
+      LLVM_DEBUG(dbgs() << "FAIL: out of address range?\n");
+      return true;
+    }
+    return false;
+  }
+
+  bool addCFIInstrs(EhReader &reader, bool isCIE) {
+    while (!reader.empty()) {
+      unsigned opcode = reader.readByte();
+      constexpr uint8_t DWARF_CFI_PRIMARY_OPCODE_MASK = 0xc0;
+      constexpr uint8_t DWARF_CFI_PRIMARY_OPERAND_MASK = 0x3f;
+      switch (opcode & DWARF_CFI_PRIMARY_OPCODE_MASK) {
+      case DW_CFA_advance_loc:
+        if (handleAdvance(opcode & DWARF_CFI_PRIMARY_OPERAND_MASK))
+          return true;
+        break;
+      case DW_CFA_offset:
+        curState.store(opcode & DWARF_CFI_PRIMARY_OPERAND_MASK, reader.readULeb128());
+        break;
+      case DW_CFA_restore:
+        curState.restore(opcode & DWARF_CFI_PRIMARY_OPERAND_MASK);
+        break;
+      default:
+        switch (opcode) {
+        case DW_CFA_advance_loc1:
+          if (handleAdvance(reader.readByte()))
+            return true;
+          break;
+        case DW_CFA_advance_loc2:
+          if (handleAdvance(reader.read16()))
+            return true;
+          break;
+        case DW_CFA_advance_loc4:
+          if (handleAdvance(reader.read32()))
+            return true;
+          break;
+        case DW_CFA_def_cfa:
+          curState.defCFARegister(reader.readULeb128());
+          curState.defCFAOffset(reader.readULeb128());
+          break;
+        case DW_CFA_def_cfa_register:
+          curState.defCFARegister(reader.readULeb128());
+          break;
+        case DW_CFA_def_cfa_offset:
+          curState.defCFAOffset(reader.readULeb128());
+          break;
+        case DW_CFA_nop:
+          break;
+        default:
+          LLVM_DEBUG(dbgs() << "FAIL: unhandled opcode " << opcode << "\n");
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  bool finalize() {
+    // Advance to keep state of most recent CFI instructions.
+    if (handleAdvance(fde.u.fde.addrRange - curOffset))
+      return true;
+    return false;
+  }
+};
+
 void elf::encodeAsCompactUnwind(Ctx &ctx, const EhSectionPiece &cie, EhSectionPiece &fde) {
   EhReader reader(fde.sec, fde.data());
   size_t encSize = getEncodingSize(ctx, cie.u.cie.fdeEncoding);
@@ -205,7 +396,22 @@ void elf::encodeAsCompactUnwind(Ctx &ctx, const EhSectionPiece &cie, EhSectionPi
   uint64_t augLen = reader.readULeb128();
   reader.skipBytes(augLen);
 
-  // TODO: actually try encoding.
+  // Default-initialize to non-compact encoding in case of failures.
   fde.u.fde.cuDescs = nullptr;
   fde.u.fde.cuDescSize = 0;
+
+  CUBuilderX86 cub(fde, cie);
+  EhReader cieReader(cie.sec, cie.data().slice(cie.u.cie.cfiBegin));
+  if (cub.addCFIInstrs(cieReader, /*isCIE=*/true))
+    return;
+  if (cub.addCFIInstrs(reader, /*isCIE=*/false))
+    return;
+  if (cub.finalize())
+    return;
+
+  size_t allocSz = sizeof(CompactUnwindDescriptor) * cub.getDescs().size();
+  void *alloc = ctx.bAlloc.Allocate(allocSz, alignof(CompactUnwindDescriptor));
+  memcpy(alloc, cub.getDescs().data(), allocSz);
+  fde.u.fde.cuDescs = reinterpret_cast<CompactUnwindDescriptor *>(alloc);
+  fde.u.fde.cuDescSize = cub.getDescs().size();
 }

@@ -106,7 +106,7 @@ createX86_64CompactUnwindTable(ArrayRef<std::pair<uint64_t, uint64_t>> Descs) {
 
   static constexpr uint8_t RegSaveOrder[] = {
       // X86::RBP, X86::R15, X86::R14, X86::R13, X86::R12, X86::RBX,
-      6, 15, 14, 13, 12, 3,
+      6, 15, 14, 13, 12, 6, 3,
   };
 
   for (auto [Idx, Entry] : enumerate(Descs.drop_back())) {
@@ -166,7 +166,7 @@ createX86_64CompactUnwindTable(ArrayRef<std::pair<uint64_t, uint64_t>> Descs) {
       break;
     }
     case 2: { // RSP
-      unsigned FrameSize = 8 * ((Desc >> 6) & 0xfffff);
+      unsigned FrameSize = 8 * ((Desc >> 7) & 0x7ffff);
       unsigned SavedRegs = 0;
       unsigned NaturalPrologueSize = 0;
       for (auto [Idx, Reg] : enumerate(RegSaveOrder)) {

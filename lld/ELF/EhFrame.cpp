@@ -234,6 +234,7 @@ class CUBuilderX86 {
 
   size_t curOffset = 0;
   CFIState curState;
+  SmallVector<CFIState, 0> stateStack;
 
 public:
   CUBuilderX86(const EhSectionPiece &fde, const EhSectionPiece &cie)
@@ -257,8 +258,6 @@ public:
     if (curState.cfaOff % 8 != 0)
       return std::nullopt;
 
-    // Reg save order: RIP, RBP, R15, R14, R13, R12, RBX. All registers but RIP
-    // are optional.
     CFIState::Reg regs[7] = {};
     for (const auto &[reg, off] : curState.regs) {
       if (off == 0 || off > 8)
@@ -267,10 +266,12 @@ public:
     }
     if (regs[0] != RIP)
       return std::nullopt;
-    static constexpr CFIState::Reg saveOrder[] = {RBP, R15, R14, R13, R12, RBX};
+    // RBP can either be at the top of the stack frame (LLVM) or between R12 and
+    // RBX (GCC). Support both.
+    static constexpr CFIState::Reg saveOrder[] = {RBP, R15, R14, R13, R12, RBP, RBX};
     unsigned regMask = 0;
     unsigned regCount = 1; // RIP
-    for (unsigned i = 0; i < 6; i++) {
+    for (unsigned i = 0; i < 7; i++) {
       if (regs[regCount] == saveOrder[i]) {
         regMask |= 1 << i;
         regCount += 1;
@@ -293,11 +294,11 @@ public:
     if (curState.cfaOff == 8)
       return 0; // Empty frame.
 
-    // mode:3, personality:3, frame_size:20, saved_regs:6.
+    // mode:3, personality:3, frame_size:19, saved_regs:7.
     // Lowest 3 bits of cfaOff are known to be zero, checked above.
-    if ((curState.cfaOff >> 3) >= uint64_t{1} << 20)
+    if ((curState.cfaOff >> 3) >= uint64_t{1} << 19)
       return std::nullopt;
-    return (2u << 29) | (curState.cfaOff << (6 - 3)) | regMask;
+    return (2u << 29) | (curState.cfaOff << (7 - 3)) | regMask;
   }
 
   bool handleAdvance(size_t delta) {
@@ -348,6 +349,14 @@ public:
         case DW_CFA_advance_loc4:
           if (handleAdvance(reader.read32()))
             return true;
+          break;
+        case DW_CFA_remember_state:
+          stateStack.push_back(curState);
+          break;
+        case DW_CFA_restore_state:
+          if (stateStack.empty())
+            return true;
+          curState = stateStack.pop_back_val();
           break;
         case DW_CFA_def_cfa:
           curState.defCFARegister(reader.readULeb128());

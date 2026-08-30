@@ -383,6 +383,218 @@ public:
     // Advance to keep state of most recent CFI instructions.
     if (handleAdvance(fde.u.fde.addrRange - curOffset))
       return true;
+    // So that we can easily compute the range of a descriptor.
+    descs.push_back(CompactUnwindDescriptor{fde.u.fde.addrRange, 1});
+    unsigned n = 0;
+    for (unsigned i = 0; i < descs.size() - 1; i++) {
+      descs[n++] = descs[i];
+      uint64_t next = descs[i + 1].desc;
+      size_t size = descs[i + 1].off - descs[n - 1].off;
+      uint64_t &desc = descs[n - 1].desc;
+
+      // We generate all descriptors without prologue/epilogue compression.
+      assert(desc >> 32 == 0 && "desc should not have prologue/epilogue yet");
+      if (desc == 0) {
+        if (size < 256 && ((next >> 29) & 7) == 2) {
+          // We can fold a NULL descriptor into the RSP prologue if there's no
+          // CSR (so could be sub rsp,xxx) or exactly one CSR with frame size 8.
+          unsigned csrs = next & 0x7f;
+          unsigned cfaSize = (next >> 7) & 0x7ffff;
+          if (csrs == 0 || ((csrs & (csrs - 1)) == 0 && cfaSize == 2)) {
+            desc = next | size << 32;
+            i += 1;
+            // Immediately fetch next descriptor, if any, to continue folding
+            // RSP-based prologue sequences.
+            if (i < descs.size() - 1) {
+              next = descs[i + 1].desc;
+              size = descs[i + 1].off - descs[n - 1].off;
+            } else {
+              continue;
+            }
+          }
+        }
+      }
+      // RSP-based frame.
+      if (((desc >> 29) & 7) == 2) {
+        // We either have a short prologue from a folded NULL descriptor or no
+        // prologue at all. We have no epilogue.
+        //
+        // First, try to build a prologue chain. This is non-trivial, as we
+        // don't know which CSRs the frame has, all we see is:
+        //       CFA=rsp+16                        <<<< desc
+        //    +2 CFA=rsp+24
+        //    +1 CFA=rsp+32 R15=[CFA-16] R14=[CFA-24]
+        // Or this:
+        //       CFA=rsp+16                        <<<< desc
+        //    +2 CFA=rsp+24
+        //    +1 CFA=rsp+32 R15=[CFA-16] R14=[CFA-24] RBX=[CFA-32]
+        // Or this (GCC):
+        //       CFA=rsp+16                        <<<< desc
+        //    +6 CFA=rsp+24
+        //    +1 CFA=rsp+32 R15=[CFA-16] R14=[CFA-24] RBX=[CFA-32]
+        // Or also this (if a previous frame didn't merge us, e.g. with GCC's
+        // separate shrink wrapping):
+        //       CFA=rsp+32                        <<<< desc
+        //    +2 CFA=rsp+40
+        //
+        // We first look forward to find growing stack frames to determine the
+        // set of CSRs. We stop when the advance is unreasonably large (>=8) or
+        // after the stack frame growth is not 8 (which must be some sub rsp,x).
+        unsigned csrs = desc & 0x7f;
+        unsigned frameSize = (desc >> 7) & 0x7ffff;
+        unsigned lastFrameSizeDelta = 0;
+        unsigned j = 0;
+        uint8_t advances[8];
+        unsigned totalAdvances = 0;
+        for (; i + j + 1 < descs.size() && j < 8; j++) {
+          uint64_t advance = descs[i + 1 + j].off - descs[i + j].off;
+          if (advance >= 8)
+            break;
+          uint64_t jdesc = descs[i + 1 + j].desc;
+          // If this is not an RSP frame, it clears some previously saved regs
+          // or the frame size doesn't grow, stop.
+          if (((jdesc >> 29) & 7) != 2 || (jdesc | csrs) != jdesc)
+            break;
+          unsigned newFrameSize = (jdesc >> 7) & 0x7ffff;
+          if (newFrameSize <= frameSize)
+            break;
+          unsigned frameSizeDelta = newFrameSize - frameSize;
+          if (frameSizeDelta == 1 && advance > 2)
+            break; // PUSH is 1 or 2 bytes.
+          advances[j] = advance;
+          totalAdvances += advance;
+          frameSize = newFrameSize;
+          lastFrameSizeDelta = frameSizeDelta;
+          csrs = jdesc & 0x7f;
+          // If we grow by more than a push, stop.
+          if (frameSizeDelta != 1) {
+            j++;
+            break;
+          }
+        }
+        if (j > 0) {
+          LLVM_DEBUG(dbgs() << "FOLD RSP: " << format("%016x j=%u fs=%u csr=%02x", desc, j, frameSize, csrs); for (unsigned k = 0; k < j; k++) dbgs() << format(" +%d:%08x", advances[k], descs[i+k+1].desc); dbgs() << "\n";);
+          // Now we must verify that the advances match our expectations.
+          unsigned numCsrs = popcount(csrs);
+          unsigned subRspDelta = frameSize - numCsrs - 1;
+          unsigned k = j;
+          if (subRspDelta) {
+            if (subRspDelta != lastFrameSizeDelta) {
+              LLVM_DEBUG(dbgs() << "FOLD RSP SKIP: last frame size delta\n");
+              goto skipPrologue;
+            }
+            // Expected instruction size.
+            unsigned subRspSize = subRspDelta == 1 ? 1 : subRspDelta < 0x10 ? 4 : 7;
+            if (advances[k - 1] != subRspSize) {
+              LLVM_DEBUG(dbgs() << "FOLD RSP SKIP: sub rsp size\n");
+              goto skipPrologue;
+            }
+            k -= 1;
+          }
+          // The last k CSRs advance sizes must match corresponding push
+          // instructions. The first push/CSR is never relevant.
+          if (k + 1 > numCsrs) {
+            LLVM_DEBUG(dbgs() << "FOLD RSP SKIP: num k\n");
+            goto skipPrologue;
+          }
+          // TODO: optimize?
+          uint8_t regs[7] = {0};
+          for (unsigned l = 0, m = 0; l < 7; l++)
+            if (csrs & (1 << l))
+              regs[m++] = l;
+          for (unsigned l = 0; l < k; l++) {
+            unsigned reg = regs[numCsrs - k + l];
+            unsigned pushSize = (reg >= 1 && reg <= 4) ? 2 : 1;
+            if (advances[l] != pushSize) {
+              LLVM_DEBUG(dbgs() << format("FOLD RSP SKIP: push size l=%u k=%u reg=%u pushSize=%u\n", l, k, reg, pushSize));
+              goto skipPrologue;
+            }
+          }
+          LLVM_DEBUG(dbgs() << "FOLD RSP SUCCESS\n");
+          uint64_t prologueSize = ((desc >> 32) & 0xff) + totalAdvances;
+          if (prologueSize < 256) {
+            i += j;
+            desc = descs[i].desc | (prologueSize << 32);
+            // Immediately fetch next descriptor, if any, to continue folding
+            // RSP-based epilogue sequences.
+            if (i < descs.size() - 1) {
+              next = descs[i + 1].desc;
+              size = descs[i + 1].off - descs[n - 1].off;
+            } else {
+              continue;
+            }
+          }
+        }
+skipPrologue:;
+        // Now, we try folding an epilogue sequence. This is easier, as we know
+        // all CSRs now.
+        // First, make sure that saved values are correct in case we aborted
+        // prologue folding.
+        csrs = desc & 0x7f;
+        frameSize = (desc >> 7) & 0x7ffff;
+        unsigned numCsrs = popcount(csrs);
+        // If there's a sub rsp, it doesn't matter, because it comes first.
+        // Otherwise, restoring the first CSR doesn't matter.
+        if (frameSize <= numCsrs) {
+          // TODO: handle. Can probably happen if there are stale CSRs below
+          // RSP due to DWARF "optimization".
+          LLVM_DEBUG(dbgs() << "FOLD RSP EPILOGUE too many CSRs\n");
+          continue;
+        }
+        bool hasSubRsp = frameSize > numCsrs + 1;
+        // TODO: optimize?
+        uint8_t regs[7] = {0};
+        for (unsigned l = 0, m = 0; l < 7; l++)
+          if (csrs & (1 << l))
+            regs[m++] = l;
+        // We simply try to fold subsequent descriptors into the current
+        // descriptor. The current descriptor has no epilogue yet. The
+        // requirements are:
+        //  - frame size of the next descriptor must just hold the CSRs.
+        //  - the address range(!) of that descriptor must match the pop size
+        //    of the CSR. The advance from the current descriptor is irrelevant.
+        //    (The range must match, because we can't just arbitrarily stop and
+        //    hold the current state in epilogue sequences. For a sequence like
+        //    add rsp, X; <DESC> pop r12; <DESC> nop; nop; pop r13 <DESC>, we
+        //    need a new descriptor after the pop r12.)
+        unsigned epilogueSize = 0;
+        unsigned count = 0;
+        while (i < descs.size() - 2) {
+          uint64_t jdesc = descs[i + 1].desc;
+          LLVM_DEBUG(dbgs() << format("FOLD RSP EP: desc=%08x idesc=%08x jdesc=%08x\n", desc, descs[i].desc, jdesc));
+          // If this is not an RSP frame, stop.
+          if (((jdesc >> 29) & 7) != 2 && jdesc != 0)
+            break;
+          unsigned newFrameSize = jdesc ? (jdesc >> 7) & 0x7ffff : 1;
+          if (newFrameSize != numCsrs - count + hasSubRsp) {
+            LLVM_DEBUG(dbgs() << format("FOLD RSP SKIP EP: newFrameSize=%u numCsrs=%u count=%u\n", newFrameSize, numCsrs, count));
+            break;
+          }
+          uint64_t range = descs[i + 2].off - descs[i + 1].off;
+          if (newFrameSize > 1) {
+            unsigned reg = regs[newFrameSize - 2];
+            unsigned pushSize = (reg >= 1 && reg <= 4) ? 2 : 1;
+            if (range != pushSize) {
+              LLVM_DEBUG(dbgs() << format("FOLD RSP SKIP EP: push size range=%u reg=%u pushSize=%u newFrameSize=%u numCsrs=%u\n", range, reg, pushSize, newFrameSize, numCsrs));
+              break;
+            }
+          }
+          if (epilogueSize + range >= 256)
+            break;
+          epilogueSize += range;
+          count += 1;
+          i += 1;
+        }
+        desc |= (uint64_t)epilogueSize << 40;
+        uint64_t size = descs[i + 1].off - descs[n - 1].off;
+        if (1 || (size && (desc >> 40 & 0xff) + (desc >> 32 & 0xff) >= size)) {
+          LLVM_DEBUG(dbgs() << format("FOO? %016lx size=%zx\n", desc, size));
+        }
+      }
+    }
+    descs.truncate(n);
+    for (size_t i = 0; i < descs.size() - 1; i++)
+      assert(descs[i].off < descs[i + 1].off);
     return false;
   }
 };

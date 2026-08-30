@@ -116,9 +116,11 @@ createX86_64CompactUnwindTable(ArrayRef<std::pair<uint64_t, uint64_t>> Descs) {
     unsigned Mode = (Desc >> 29) & 0x7;
     unsigned PrologueSize = (Desc >> 32) & 0xff;
     unsigned EpilogueSize = (Desc >> 40) & 0xff;
-    if (Len < PrologueSize + EpilogueSize)
-      return createStringError(errc::invalid_argument,
-                               "CU len smaller than prologue+epilogue");
+    if (Len != 0 && Len < PrologueSize + EpilogueSize) {
+      std::string msg;
+      raw_string_ostream(msg) << format("CU len smaller than prologue+epilogue: %016lx len=%zx", Desc, Len);
+      return createStringError(errc::invalid_argument, std::move(msg));
+    }
     switch (Mode) {
     case 7: // DWARF
       // TODO: read FDE here?

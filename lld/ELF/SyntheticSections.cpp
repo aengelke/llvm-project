@@ -534,13 +534,15 @@ void EhFrameHeader::finalizeContents() {
     return;
   }
 
-  SmallVector<CompactUnwindDescriptor> descs;
   uint64_t hdrVA = getVA();
 
   lastVARel = INT64_MIN;
+  SmallVector<std::pair<int64_t, EhSectionPiece *>> fdes;
   for (CieRecord *rec : ehFrame->getCieRecords()) {
     // uint8_t fdeEnc = getFdeEncoding(rec->cie);
     for (EhSectionPiece *fde : rec->fdes) {
+      if (fde->u.fde.addrRange == 0)
+        continue;
       assert(fde->firstRelocation != -1u);
       // The FDE has passed `isFdeLive`, so the first relocation's symbol is a
       // live Defined.
@@ -548,6 +550,8 @@ void EhFrameHeader::finalizeContents() {
       auto &reloc = isec->rels[fde->firstRelocation];
       assert(isa<Defined>(reloc.sym) && "isFdeLive should have checked this");
       uint64_t pcRel = reloc.sym->getVA(ctx) + reloc.addend - hdrVA;
+      fdes.emplace_back(int64_t(pcRel), fde);
+#if 0
       size_t start = descs.size();
       if (int64_t(pcRel + fde->u.fde.addrRange) > lastVARel)
         lastVARel = pcRel + fde->u.fde.addrRange;
@@ -568,6 +572,7 @@ void EhFrameHeader::finalizeContents() {
         descs.push_back({pcRel + fde->u.fde.addrRange, 1});
         // TODO: collect LSDA if personality is set
       }
+#endif
       // for (size_t i = start; i != descs.size(); ++i)
       //   llvm::dbgs() << "Got CU: "
       //                << llvm::format("%016zx %016zx", descs[i].desc,
@@ -575,9 +580,31 @@ void EhFrameHeader::finalizeContents() {
     }
   }
 
-  llvm::stable_sort(descs,
-                    [](const auto &a, const auto &b) { return a.off < b.off; });
+  llvm::sort(fdes, llvm::less_first());
+  lastVARel = fdes.back().first + fdes.back().second->u.fde.addrRange;
 
+  SmallVector<CompactUnwindDescriptor> descs;
+  for (auto &[pcRel, fde] : fdes) {
+    // newLarge |= !isInt<32>(pcRel); XXX
+    if (fde->compactUnwindDescriptors().empty()) {
+      uint64_t fdeVARel = ehFrame->getParent()->addr + fde->outputOff - hdrVA;
+      assert(isInt<29>(fdeVARel)); // TODO: error
+      descs.push_back({uint64_t(pcRel), uint64_t{7} << 29 | fdeVARel});
+    } else {
+      for (const auto &desc : fde->compactUnwindDescriptors())
+        descs.push_back(CompactUnwindDescriptor{desc.off + pcRel, desc.desc});
+      // Epilogue in descriptors is relative to the next descriptor or the end
+      // of the function. Because there might be padding afterwards, add a
+      // zero terminator here. Use value 1 to indicate that the actual value
+      // is meaningless and that this descriptor can be optimized away.
+      // TODO: as an initial approximation, only add this if the preceding
+      // descriptor actually has an epilogue.
+      descs.push_back({uint64_t(pcRel) + fde->u.fde.addrRange, 1});
+      // TODO: collect LSDA if personality is set
+    }
+
+  }
+  
   // TODO: optimize descs
   // Optimize descriptors. The first and last descriptor cannot be removed,
   // because they describe the address range.
@@ -591,6 +618,7 @@ void EhFrameHeader::finalizeContents() {
     uint64_t &curDesc = descs[i].desc;
     uint64_t curSz = descs[i + 1].off - descs[i].off;
 
+    //dbgs() << format("opt: %016lx+%ld(%zx) prev=%016lx+%ld(%zx) (%zx)\n", curDesc, curSz, descs[i].off, prevDesc, prevSz, descs[j - 1].off, descs[i + 1].off);
     // For padding descriptors, fold as much into the epilogue of the preceding
     // descriptor as possible.
     if (curDesc == 1) {
@@ -603,6 +631,7 @@ void EhFrameHeader::finalizeContents() {
       if (prevEpilogueSize + curSz < 0x100) {
         prevEpilogueSize += curSz;
         uint64_t mask = uint64_t{0xff} << 40;
+        //dbgs() << format("merge: %016lx prev=%016lx newepsz=%u\n", curDesc, prevDesc, prevEpilogueSize);
         prevDesc = (prevDesc & ~mask) | (prevEpilogueSize << 40);
         continue;
       }

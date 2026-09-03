@@ -143,7 +143,7 @@ public:
   /// v2: Start offset of LSDA entries.
   uint32_t cuLSDAOff;
   /// v2: LSDA entries. Functions have an entry iff they have a personality fn.
-  llvm::SmallVector<CompactUnwindLSDAEntry, 0> cuLSDAEntries;
+  llvm::SmallVector<CompactUnwindLSDAEntry, 0> cuLSDAs;
 };
 
 class GotSection final : public SyntheticSection {

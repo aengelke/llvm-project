@@ -167,6 +167,7 @@ void elf::parseCIE(EhSectionPiece &p) {
       break;
     case 'L':
       p.u.cie.hasLSDA = true;
+      reader.readByte();
       break;
     case 'R':
       p.u.cie.fdeEncoding = reader.readByte();
@@ -262,6 +263,8 @@ public:
     for (const auto &[reg, off] : curState.regs) {
       if (off == 0 || off > 8)
         return std::nullopt;
+      if (curState.cfaReg == RSP && off >= curState.cfaOff)
+        continue;
       regs[off - 1] = reg;
     }
     if (regs[0] != RIP)
@@ -367,6 +370,12 @@ public:
           break;
         case DW_CFA_def_cfa_offset:
           curState.defCFAOffset(reader.readULeb128());
+          break;
+        case DW_CFA_GNU_args_size:
+          if (uint64_t argSize = reader.readULeb128()) {
+            LLVM_DEBUG(dbgs() << "FAIL: GNU_args_size " << argSize << "\n");
+            return true;
+          }
           break;
         case DW_CFA_nop:
           break;

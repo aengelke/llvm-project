@@ -422,6 +422,7 @@ void EhFrameSection::writeTo(uint8_t *buf) {
 
   // Write the .eh_frame_hdr section using cached FDE data from updateAllocSize.
   uint8_t *hdrBuf = ctx.bufferStart + hdr->getParent()->offset + hdr->outSecOff;
+  uint8_t *hdrBufStart = hdrBuf;
   uint64_t hdrVA = hdr->getVA();
   int64_t ehFramePtr = getParent()->addr - hdrVA - 4;
 
@@ -467,16 +468,17 @@ void EhFrameSection::writeTo(uint8_t *buf) {
     write32(ctx, hdrBuf, page.pcRel);
     write32(ctx, hdrBuf + 4, page.pageOff);
     write32(ctx, hdrBuf + 8,
-            hdr->cuLSDAOff + sizeof(uint32_t) * page.firstLSDAEntry);
+            hdr->cuLSDAOff + 2 * sizeof(uint32_t) * page.firstLSDAEntry);
     hdrBuf += 12;
   }
   // Sentinel page entry.
   write32(ctx, hdrBuf, hdr->lastVARel);
   write32(ctx, hdrBuf + 4, 0xdeaddead);
-  write32(ctx, hdrBuf + 8, 0); // XXX: last LSDA offset
+  write32(ctx, hdrBuf + 8, hdr->cuLSDAOff + 2 * sizeof(uint32_t) * hdr->cuLSDAs.size());
   hdrBuf += 12;
   for (auto it : personalityMap) {
-    write32(ctx, hdrBuf, 0xdeadbeef); // XXX
+    uint64_t pcRel = it.first->getVA(ctx) - hdrVA;
+    write32(ctx, hdrBuf, pcRel);
     hdrBuf += 4;
   }
   for (uint64_t desc : hdr->cuGlobalDescriptors) {
@@ -499,6 +501,14 @@ void EhFrameSection::writeTo(uint8_t *buf) {
       hdrBuf += 8;
     }
   }
+  assert(hdrBuf - hdrBufStart == hdr->cuLSDAOff);
+  for (const auto &entry : hdr->cuLSDAs) {
+    write32(ctx, hdrBuf, entry.pcRel);
+    write32(ctx, hdrBuf + 4, entry.lsdaRel);
+        dbgs() << format("LSDA enc %016x %016x\n", entry.pcRel, entry.lsdaRel);
+    hdrBuf += 8;
+  }
+  dbgs() << format("LSDA table %zx..%zx\n", hdr->cuLSDAOff, hdrBuf - hdrBufStart);
 }
 
 EhFrameHeader::EhFrameHeader(Ctx &ctx)
@@ -537,7 +547,7 @@ void EhFrameHeader::finalizeContents() {
   uint64_t hdrVA = getVA();
 
   lastVARel = INT64_MIN;
-  SmallVector<std::pair<int64_t, EhSectionPiece *>> fdes;
+  SmallVector<std::tuple<int64_t, CieRecord *, EhSectionPiece *, int64_t>> fdes;
   for (CieRecord *rec : ehFrame->getCieRecords()) {
     // uint8_t fdeEnc = getFdeEncoding(rec->cie);
     for (EhSectionPiece *fde : rec->fdes) {
@@ -550,7 +560,14 @@ void EhFrameHeader::finalizeContents() {
       auto &reloc = isec->rels[fde->firstRelocation];
       assert(isa<Defined>(reloc.sym) && "isFdeLive should have checked this");
       uint64_t pcRel = reloc.sym->getVA(ctx) + reloc.addend - hdrVA;
-      fdes.emplace_back(int64_t(pcRel), fde);
+      int64_t lsdaRel = 0;
+      if (rec->cie->u.cie.hasLSDA) {
+        // TODO: super-unsafe!
+        auto &reloc = isec->rels[fde->firstRelocation + 1];
+        lsdaRel = reloc.sym->getVA(ctx) + reloc.addend - hdrVA;
+        dbgs() << format("LSDA %016x %016x firstRel=%zu@%#zx lsda=%#zx hdrVA=%#zx\n", pcRel, lsdaRel, fde->firstRelocation, reloc.offset, reloc.sym->getVA(ctx), hdrVA);
+      }
+      fdes.emplace_back(int64_t(pcRel), rec, fde, lsdaRel);
 #if 0
       size_t start = descs.size();
       if (int64_t(pcRel + fde->u.fde.addrRange) > lastVARel)
@@ -581,10 +598,13 @@ void EhFrameHeader::finalizeContents() {
   }
 
   llvm::sort(fdes, llvm::less_first());
-  lastVARel = fdes.back().first + fdes.back().second->u.fde.addrRange;
+  const auto &[lastFDEPCRel, _1, lastFDE, _2] = fdes.back();
+  lastVARel = lastFDEPCRel + lastFDE->u.fde.addrRange;
 
   SmallVector<CompactUnwindDescriptor> descs;
-  for (auto &[pcRel, fde] : fdes) {
+  cuLSDAs.clear();
+  for (auto &[pcRel, rec, fde, lsdaRel] : fdes) {
+    unsigned personality = rec->personality;
     // newLarge |= !isInt<32>(pcRel); XXX
     if (fde->compactUnwindDescriptors().empty()) {
       uint64_t fdeVARel = ehFrame->getParent()->addr + fde->outputOff - hdrVA;
@@ -592,7 +612,7 @@ void EhFrameHeader::finalizeContents() {
       descs.push_back({uint64_t(pcRel), uint64_t{7} << 29 | fdeVARel});
     } else {
       for (const auto &desc : fde->compactUnwindDescriptors())
-        descs.push_back(CompactUnwindDescriptor{desc.off + pcRel, desc.desc});
+        descs.push_back(CompactUnwindDescriptor{desc.off + pcRel, desc.desc | personality << 26});
       // Epilogue in descriptors is relative to the next descriptor or the end
       // of the function. Because there might be padding afterwards, add a
       // zero terminator here. Use value 1 to indicate that the actual value
@@ -600,7 +620,11 @@ void EhFrameHeader::finalizeContents() {
       // TODO: as an initial approximation, only add this if the preceding
       // descriptor actually has an epilogue.
       descs.push_back({uint64_t(pcRel) + fde->u.fde.addrRange, 1});
-      // TODO: collect LSDA if personality is set
+      if (personality >= 8)
+        Err(ctx) << "too many personality functions";
+      if (personality) {
+        cuLSDAs.push_back(CompactUnwindLSDAEntry{pcRel, lsdaRel});
+      }
     }
 
   }
@@ -715,7 +739,11 @@ descriptors = descriptors[:j]
     localDescMap.clear();
     CompactUnwindPage &page = cuPages.emplace_back();
     page.pcRel = descs[descIdx].off;
-    page.firstLSDAEntry = 0; // XXX
+    auto lsdaIt = std::lower_bound(cuLSDAs.begin(), cuLSDAs.end(), page.pcRel, [](const auto &a, const auto &b) { return a.pcRel < b; });
+    if (lsdaIt == cuLSDAs.begin())
+      page.firstLSDAEntry = 0;
+    else
+      page.firstLSDAEntry = lsdaIt - cuLSDAs.begin() - 1;
     while (descIdx < descs.size()) {
       // Remaining size on the page.
       size_t remainingSize = cu::PageSize - page.size();
@@ -755,8 +783,8 @@ descriptors = descriptors[:j]
     size += page.size();
   }
   cuLSDAOff = size;
-  // llvm::dbgs() << "size=" << size << "\n";
-  // size += 2 * sizeof(uint32_t) * cuLSDAs.size();
+  size += 2 * sizeof(uint32_t) * cuLSDAs.size();
+  llvm::dbgs() << "size=" << size << "\n";
 }
 
 bool EhFrameHeader::updateAllocSize(Ctx &ctx) {

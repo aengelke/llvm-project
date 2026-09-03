@@ -233,7 +233,7 @@ createX86_64CompactUnwindTable(ArrayRef<std::pair<uint64_t, uint64_t>> Descs) {
           First = false;
         }
         for (auto [Idx, Reg] : enumerate(reverse(RegSaveOrder))) {
-          if (!(Desc & (1 << (5 - Idx))))
+          if (!(Desc & (1 << (6 - Idx))))
             continue;
           if (!First)
             EpilogueLoc += Reg < 8 ? 1 : 2;
@@ -299,14 +299,20 @@ void PrinterContext<ELFT>::printEHFrameHdr(const Elf_Phdr *EHFramePHdr) const {
     uint32_t PersonalitiesOff = DE.getU32(&Offset);
     uint32_t GlobalDescsOff = DE.getU32(&Offset);
     uint32_t PageCount = DE.getU32(&Offset);
+    uint64_t LSDAOff, LSDAEndOff;
     for (uint32_t i = 0; i != PageCount + 1; ++i) {
       dbgs() << "Page " << i << "/" << PageCount << "\n";
-      uint32_t Pc = EHFrameHdrAddress + DE.getU32(&Offset);
+      uint32_t Pc = EHFrameHdrAddress + DE.getS32(&Offset);
       uint64_t PageStart = DE.getU32(&Offset);
       uint32_t FirstLSDAOff = DE.getU32(&Offset);
+      if (i == 0)
+        LSDAOff = FirstLSDAOff;
+      if (i == PageCount)
+        LSDAEndOff = FirstLSDAOff;
       // Print entry even for the sentinel page.
       DictScope D(W, std::string("page ") + std::to_string(i));
       W.startLine() << format("pc: 0x%" PRIx64 "\n", Pc);
+      W.startLine() << format("lsda_idx: %u (%#x)\n", (FirstLSDAOff - LSDAOff) / 8, FirstLSDAOff);
 
       uint64_t PageOff = PageStart;
       unsigned EntryCount = DE.getU16(&PageOff);
@@ -331,17 +337,33 @@ void PrinterContext<ELFT>::printEHFrameHdr(const Elf_Phdr *EHFramePHdr) const {
         else
           DescOff = LocalDescsOff + sizeof(uint64_t) * (DescIdx - 0x1000 + 341);
         uint64_t Desc = DE.getU64(&DescOff);
-        // XXX: print personality function, if any?
         if (((Desc >> 29) & 7) == 7) {
           uint64_t FDEAddr = EHFrameHdrAddress + (Desc & 0x1fffffff);
           W.startLine() << format("entry: 0x%" PRIx64 " %016" PRIx64
-                                  " (FDE 0x%" PRIx64 ")\n",
+                                  " (FDE 0x%" PRIx64 ")",
                                   Pc + (Entry >> 12), Desc, FDEAddr);
         } else {
-          W.startLine() << format("entry: 0x%" PRIx64 " %016" PRIx64 "\n",
+          W.startLine() << format("entry: 0x%" PRIx64 " %016" PRIx64 "",
                                   Pc + (Entry >> 12), Desc);
+          if (unsigned PersonalityIdx = (Desc >> 26) & 7) {
+            uint64_t PersOff = PersonalitiesOff + (PersonalityIdx - 1) * 4;
+            uint32_t PersAddr = EHFrameHdrAddress + DE.getU32(&PersOff);
+            W.getOStream() << format(" (personality: 0x%" PRIx64 ")\n", PersAddr);
+          } else {
+            W.getOStream() << '\n';
+          }
         }
         Descs.emplace_back(Pc + (Entry >> 12), Desc);
+      }
+    }
+    {
+      DictScope D(W, std::string("lsda"));
+      unsigned Idx = 0;
+      while (LSDAOff < LSDAEndOff) {
+        uint64_t PCRel = DE.getS32(&LSDAOff) + EHFrameHdrAddress;
+        uint64_t LSDARel = DE.getS32(&LSDAOff) + EHFrameHdrAddress;
+        W.startLine() << format("%u: 0x%" PRIx64 " LSDA: 0x%" PRIx64 " @ %#zx\n", Idx, PCRel, LSDARel, LSDAOff);
+        Idx += 1;
       }
     }
     // XXX: LSDA table

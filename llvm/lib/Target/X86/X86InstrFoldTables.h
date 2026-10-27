@@ -21,8 +21,8 @@ namespace llvm {
 // This struct is used for both the folding and unfold tables. They KeyOp
 // is used to determine the sorting order.
 struct X86FoldTableEntry {
-  unsigned KeyOp;
-  unsigned DstOp;
+  uint16_t KeyOp;
+  uint16_t DstOp;
   uint16_t Flags;
 
   bool operator<(const X86FoldTableEntry &RHS) const {

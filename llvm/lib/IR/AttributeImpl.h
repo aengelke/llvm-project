@@ -23,6 +23,7 @@
 #include "llvm/IR/ConstantRange.h"
 #include "llvm/IR/ConstantRangeList.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <bitset>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -251,18 +252,14 @@ public:
 
 class AttributeBitSet {
   /// Bitset with a bit for each available attribute Attribute::AttrKind.
-  uint8_t AvailableAttrs[16] = {};
-  static_assert(Attribute::EndAttrKinds <= sizeof(AvailableAttrs) * CHAR_BIT,
-                "Too many attributes");
+  std::bitset<Attribute::EndAttrKinds> AvailableAttrs = {};
 
 public:
   bool hasAttribute(Attribute::AttrKind Kind) const {
-    return AvailableAttrs[Kind / 8] & (1 << (Kind % 8));
+    return AvailableAttrs[Kind];
   }
 
-  void addAttribute(Attribute::AttrKind Kind) {
-    AvailableAttrs[Kind / 8] |= 1 << (Kind % 8);
-  }
+  void addAttribute(Attribute::AttrKind Kind) { AvailableAttrs[Kind] = true; }
 };
 
 //===----------------------------------------------------------------------===//
